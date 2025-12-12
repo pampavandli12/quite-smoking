@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useColorScheme } from "react-native";
 import { PaperProvider } from "react-native-paper";
 import { initializeDatabase } from "../db/client";
+import PurchaseService from "../services/purchases";
 import { darkTheme, lightTheme } from "./theme";
 
 // Keep the splash screen visible while we fetch resources
@@ -21,6 +22,7 @@ export default function RootLayout() {
     colorScheme === "dark" ? darkTheme : lightTheme
   );
   const [dbInitialized, setDbInitialized] = useState(false);
+  const [purchasesInitialized, setPurchasesInitialized] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Roboto_400Regular,
@@ -37,16 +39,30 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded && dbInitialized) {
+    async function setupPurchases() {
+      try {
+        await PurchaseService.initialize();
+        setPurchasesInitialized(true);
+      } catch (error) {
+        console.error("Failed to initialize purchases:", error);
+        // Still allow app to continue even if purchases fail
+        setPurchasesInitialized(true);
+      }
+    }
+    setupPurchases();
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && dbInitialized && purchasesInitialized) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, dbInitialized]);
+  }, [fontsLoaded, dbInitialized, purchasesInitialized]);
 
   useEffect(() => {
     setTheme(colorScheme === "dark" ? darkTheme : lightTheme);
   }, [colorScheme]);
 
-  if (!fontsLoaded || !dbInitialized) {
+  if (!fontsLoaded || !dbInitialized || !purchasesInitialized) {
     return null;
   }
 

@@ -1,5 +1,7 @@
+import PurchaseService from "@/services/purchases";
 import { router } from "expo-router";
-import { ScrollView, StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, ScrollView, StyleSheet } from "react-native";
 import {
   Button,
   Divider,
@@ -8,13 +10,126 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
+import type { PurchasesPackage } from "react-native-purchases";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SubscriptionPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(false);
+  const [subscriptionPackage, setSubscriptionPackage] =
+    useState<PurchasesPackage | null>(null);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
 
-  const handleSubscribe = () => {
+  useEffect(() => {
+    checkSubscription();
+    loadOfferings();
+  }, []);
+
+  const checkSubscription = async () => {
+    const isActive = await PurchaseService.checkSubscriptionStatus();
+    setHasActiveSubscription(isActive);
+    if (isActive) {
+      // User already has subscription, navigate to home
+      router.replace("/(tabs)/home");
+    }
+  };
+
+  const loadOfferings = async () => {
+    try {
+      const offering = await PurchaseService.getOfferings();
+      if (offering && offering.availablePackages.length > 0) {
+        // Get monthly package or first available package
+        const monthlyPackage =
+          offering.monthly || offering.availablePackages[0];
+        setSubscriptionPackage(monthlyPackage);
+      }
+    } catch (error) {
+      console.error("Error loading offerings:", error);
+    }
+  };
+
+  const handleSubscribe = async () => {
+    if (!subscriptionPackage) {
+      Alert.alert(
+        "Not Available",
+        "Subscription packages are not available at the moment. Please try again later."
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { success, customerInfo, error } =
+        await PurchaseService.purchasePackage(subscriptionPackage);
+
+      if (success && customerInfo) {
+        Alert.alert("Success!", "Welcome to Premium! 🎉", [
+          {
+            text: "Continue",
+            onPress: () => router.replace("/(tabs)/home"),
+          },
+        ]);
+      } else if (error && !error.userCancelled) {
+        Alert.alert(
+          "Purchase Failed",
+          "Something went wrong. Please try again."
+        );
+      }
+    } catch (error) {
+      console.error("Purchase error:", error);
+      Alert.alert("Error", "An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setLoading(true);
+    try {
+      const { success, customerInfo } =
+        await PurchaseService.restorePurchases();
+
+      if (success && customerInfo) {
+        // Check if we're in mock mode
+        const isMock = PurchaseService.isMockMode();
+
+        if (isMock) {
+          // In mock mode, just show a message
+          Alert.alert(
+            "Mock Mode",
+            "Running in development mode. No purchases to restore."
+          );
+        } else {
+          const hasEntitlement =
+            typeof customerInfo.entitlements?.active?.["premium"] !==
+            "undefined";
+
+          if (hasEntitlement) {
+            Alert.alert("Success!", "Your purchase has been restored! 🎉", [
+              {
+                text: "Continue",
+                onPress: () => router.replace("/(tabs)/home"),
+              },
+            ]);
+          } else {
+            Alert.alert(
+              "No Purchases Found",
+              "We couldn't find any previous purchases to restore."
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Restore error:", error);
+      Alert.alert("Error", "Failed to restore purchases. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkip = () => {
+    // Allow user to skip subscription for now
     router.replace("/(tabs)/home");
   };
 
@@ -110,7 +225,7 @@ export default function SubscriptionPage() {
       {/* Pricing Section */}
       <Surface style={styles.pricingSection} elevation={0}>
         <Text variant="displaySmall" style={styles.price}>
-          £9.99/month
+          $1.20/month
         </Text>
         <Text variant="bodyMedium" style={styles.priceSubtext}>
           after 7-day free trial
@@ -170,8 +285,10 @@ export default function SubscriptionPage() {
         style={styles.ctaButton}
         contentStyle={styles.ctaButtonContent}
         onPress={handleSubscribe}
+        loading={loading}
+        disabled={loading}
       >
-        Start 7-Day Free Trial
+        {loading ? "Processing..." : "Start 7-Day Free Trial"}
       </Button>
 
       {/* Restore Purchase Button */}
@@ -179,14 +296,28 @@ export default function SubscriptionPage() {
         mode="text"
         style={styles.restoreButton}
         textColor={theme.colors.secondary}
-        onPress={() => {}}
+        onPress={handleRestore}
+        disabled={loading}
       >
         Restore Purchase
       </Button>
 
+      {/* Skip Button (for testing) */}
+      <Button
+        mode="text"
+        style={styles.skipButton}
+        textColor={theme.colors.onSurfaceVariant}
+        onPress={handleSkip}
+        disabled={loading}
+      >
+        Skip for now
+      </Button>
+
       {/* Terms */}
       <Text variant="bodySmall" style={styles.terms}>
-        By continuing, you agree to our Terms of Service and Privacy Policy
+        By continuing, you agree to our Terms of Service and Privacy Policy.
+        Subscription automatically renews unless cancelled at least 24 hours
+        before the end of the trial period.
       </Text>
     </ScrollView>
   );
@@ -317,6 +448,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   restoreButton: {
+    marginBottom: 8,
+  },
+  skipButton: {
     marginBottom: 16,
   },
   terms: {
