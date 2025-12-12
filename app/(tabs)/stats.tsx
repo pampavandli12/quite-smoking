@@ -530,8 +530,20 @@ export default function StatsPage() {
                 Your Goals
               </Text>
               {previousTotal > 0 && (
-                <Surface style={styles.goalBadge} elevation={0}>
-                  <Text variant="titleMedium" style={styles.goalPercentage}>
+                <Surface
+                  style={[
+                    styles.goalBadge,
+                    { borderColor: theme.colors.primary },
+                  ]}
+                  elevation={0}
+                >
+                  <Text
+                    variant="titleMedium"
+                    style={[
+                      styles.goalPercentage,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
                     {Math.abs(percentageChange)}%
                   </Text>
                 </Surface>
@@ -574,10 +586,19 @@ export default function StatsPage() {
         </Card>
 
         {/* Health Insight */}
-        <Card style={[styles.insightCard, { backgroundColor: "#E3F2FD" }]}>
+        <Card
+          style={[
+            styles.insightCard,
+            { backgroundColor: theme.colors.primaryContainer },
+          ]}
+        >
           <Card.Content>
             <Surface style={styles.insightHeader} elevation={0}>
-              <Icon source="lightbulb-outline" size={20} color="#4285F4" />
+              <Icon
+                source="lightbulb-outline"
+                size={20}
+                color={theme.colors.primary}
+              />
               <Text variant="titleMedium" style={styles.insightTitle}>
                 Health Insight
               </Text>
@@ -793,21 +814,18 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     borderWidth: 4,
-    borderColor: "#4285F4",
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "transparent",
   },
   goalPercentage: {
-    color: "#4285F4",
     fontWeight: "bold",
   },
   goalDescription: {
     marginBottom: 8,
-    color: "#666",
+    opacity: 0.7,
   },
   goalStatus: {
-    color: "#4CAF50",
     fontWeight: "500",
   },
   insightCard: {
@@ -822,10 +840,8 @@ const styles = StyleSheet.create({
   },
   insightTitle: {
     fontWeight: "600",
-    color: "#4285F4",
   },
   insightText: {
-    color: "#333",
     lineHeight: 20,
   },
 });
