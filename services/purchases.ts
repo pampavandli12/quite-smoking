@@ -14,8 +14,8 @@ const isExpoGo = Constants.appOwnership === "expo";
 const REVENUECAT_API_KEY = Platform.select({
   ios: isExpoGo ? "appl_test_YOUR_TEST_KEY" : "appl_YOUR_IOS_API_KEY_HERE",
   android: isExpoGo
-    ? "goog_test_YOUR_TEST_KEY"
-    : "goog_YOUR_ANDROID_API_KEY_HERE",
+    ? "test_rGcJzBvPICvxCewJbeUyPjmGKeO"
+    : "goog_FLoWBujNJyaCqMBVQnvncXUMorF",
 });
 
 class PurchaseService {
@@ -43,7 +43,7 @@ class PurchaseService {
       (!REVENUECAT_API_KEY || REVENUECAT_API_KEY.includes("YOUR"))
     ) {
       console.warn(
-        "Running in Expo Go without RevenueCat keys - using mock mode"
+        "Running in Expo Go without RevenueCat keys - using mock mode",
       );
       this.mockMode = true;
       this.isConfigured = true;
@@ -114,7 +114,7 @@ class PurchaseService {
    * Purchase a subscription package
    */
   async purchasePackage(
-    packageToPurchase: PurchasesPackage
+    packageToPurchase: PurchasesPackage,
   ): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: any }> {
     if (this.mockMode) {
       console.log("Mock mode: Simulating successful purchase");
@@ -130,9 +130,8 @@ class PurchaseService {
     }
 
     try {
-      const { customerInfo } = await Purchases.purchasePackage(
-        packageToPurchase
-      );
+      const { customerInfo } =
+        await Purchases.purchasePackage(packageToPurchase);
       return { success: true, customerInfo };
     } catch (error: any) {
       if (!error.userCancelled) {

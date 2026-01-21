@@ -41,11 +41,18 @@
             "backgroundColor": "#1a1a2e"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ac159556-9ec1-4d90-a104-4c0483eeb119"
+      }
     }
   }
 }
