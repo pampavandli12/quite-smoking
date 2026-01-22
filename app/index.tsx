@@ -1,6 +1,6 @@
 import PurchaseService from "@/services/purchases";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet } from "react-native";
 import {
   Button,
@@ -26,6 +26,19 @@ export default function SubscriptionPage() {
     loadOfferings();
   }, []);
 
+  useEffect(() => {
+    if (hasActiveSubscription) {
+      // If user has active subscription, navigate to home
+      router.replace("/(tabs)/home");
+    }
+  }, [hasActiveSubscription]);
+
+  useEffect(() => {
+    console.log(
+      "Subscription Package:",
+      JSON.stringify(subscriptionPackage, null, 2),
+    );
+  }, [subscriptionPackage]);
   const checkSubscription = async () => {
     const isActive = await PurchaseService.checkSubscriptionStatus();
     setHasActiveSubscription(isActive);
@@ -49,11 +62,17 @@ export default function SubscriptionPage() {
     }
   };
 
+  const priceString = useCallback(() => {
+    if (!subscriptionPackage) return "";
+    const price = subscriptionPackage.product.priceString;
+    const period = "monthly"; // Assuming monthly for simplicity
+    return `${price}/${period}`;
+  }, [subscriptionPackage]);
   const handleSubscribe = async () => {
     if (!subscriptionPackage) {
       Alert.alert(
         "Not Available",
-        "Subscription packages are not available at the moment. Please try again later."
+        "Subscription packages are not available at the moment. Please try again later.",
       );
       return;
     }
@@ -73,7 +92,7 @@ export default function SubscriptionPage() {
       } else if (error && !error.userCancelled) {
         Alert.alert(
           "Purchase Failed",
-          "Something went wrong. Please try again."
+          "Something went wrong. Please try again.",
         );
       }
     } catch (error) {
@@ -98,7 +117,7 @@ export default function SubscriptionPage() {
           // In mock mode, just show a message
           Alert.alert(
             "Mock Mode",
-            "Running in development mode. No purchases to restore."
+            "Running in development mode. No purchases to restore.",
           );
         } else {
           const hasEntitlement =
@@ -115,7 +134,7 @@ export default function SubscriptionPage() {
           } else {
             Alert.alert(
               "No Purchases Found",
-              "We couldn't find any previous purchases to restore."
+              "We couldn't find any previous purchases to restore.",
             );
           }
         }
@@ -142,7 +161,7 @@ export default function SubscriptionPage() {
       ]}
     >
       {/* Header Image */}
-      <Surface style={styles.headerImageContainer} elevation={0}>
+      {/* <Surface style={styles.headerImageContainer} elevation={0}>
         <Surface
           style={[
             styles.headerImagePlaceholder,
@@ -151,7 +170,7 @@ export default function SubscriptionPage() {
         >
           <Icon source="account-group" size={60} color={theme.colors.primary} />
         </Surface>
-      </Surface>
+      </Surface> */}
 
       {/* Title Section */}
       <Surface style={styles.titleSection} elevation={0}>
@@ -225,13 +244,10 @@ export default function SubscriptionPage() {
       {/* Pricing Section */}
       <Surface style={styles.pricingSection} elevation={0}>
         <Text variant="displaySmall" style={styles.price}>
-          $1.20/month
+          {priceString()}
         </Text>
         <Text variant="bodyMedium" style={styles.priceSubtext}>
           after 7-day free trial
-        </Text>
-        <Text variant="bodyMedium" style={styles.savings}>
-          Save 50% vs monthly
         </Text>
       </Surface>
 
@@ -265,12 +281,12 @@ export default function SubscriptionPage() {
 
       {/* Payment Methods */}
       <Surface style={styles.paymentSection} elevation={0}>
-        <Surface style={styles.paymentIcons} elevation={0}>
+        {/* <Surface style={styles.paymentIcons} elevation={0}>
           <Icon source="credit-card" size={24} color={theme.colors.onSurface} />
           <Icon source="apple" size={24} color={theme.colors.onSurface} />
           <Icon source="google" size={24} color={theme.colors.onSurface} />
           <Icon source="cash" size={24} color={theme.colors.onSurface} />
-        </Surface>
+        </Surface> */}
         <Surface style={styles.secureRow} elevation={0}>
           <Icon source="lock" size={16} color={theme.colors.onSurfaceVariant} />
           <Text variant="bodySmall" style={styles.secureText}>
@@ -303,7 +319,7 @@ export default function SubscriptionPage() {
       </Button>
 
       {/* Skip Button (for testing) */}
-      <Button
+      {/* <Button
         mode="text"
         style={styles.skipButton}
         textColor={theme.colors.onSurfaceVariant}
@@ -311,7 +327,7 @@ export default function SubscriptionPage() {
         disabled={loading}
       >
         Skip for now
-      </Button>
+      </Button> */}
 
       {/* Terms */}
       <Text variant="bodySmall" style={styles.terms}>
