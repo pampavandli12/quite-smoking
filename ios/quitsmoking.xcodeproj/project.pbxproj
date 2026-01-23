@@ -9,10 +9,10 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		5B765006395DE3DC68F2B161 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 369D69BECEA546D5DA8E5A65 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		BFB00F8CFBD83C55CDD966C6 /* libPods-quitsmoking.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B4592258C602FBF0747D94E /* libPods-quitsmoking.a */; };
-		C9293C413DB72E9D1D966844 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8006D541D577A3AF38B2A0CF /* PrivacyInfo.xcprivacy */; };
-		D91A8D3983FF46352105BA25 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA23C7FACACA6E116DA98EB5 /* ExpoModulesProvider.swift */; };
+		C2CF24E6AEE99875714B18D7 /* libPods-quitsmoking.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D2F89D481E24C2644B231A27 /* libPods-quitsmoking.a */; };
+		CC016DDED75442FCD7745B8A /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31727AE334B2D4A4C123D4AD /* ExpoModulesProvider.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
@@ -20,13 +20,13 @@
 		13B07F961A680F5B00A75B9A /* quitsmoking.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = quitsmoking.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = quitsmoking/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = quitsmoking/Info.plist; sourceTree = "<group>"; };
-		8006D541D577A3AF38B2A0CF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = quitsmoking/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		8B4592258C602FBF0747D94E /* libPods-quitsmoking.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-quitsmoking.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		31727AE334B2D4A4C123D4AD /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-quitsmoking/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		369D69BECEA546D5DA8E5A65 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = quitsmoking/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		55E4E02E64CAB476724AABB2 /* Pods-quitsmoking.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-quitsmoking.debug.xcconfig"; path = "Target Support Files/Pods-quitsmoking/Pods-quitsmoking.debug.xcconfig"; sourceTree = "<group>"; };
+		A08BD74D4DBBDF5FA72418AA /* Pods-quitsmoking.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-quitsmoking.release.xcconfig"; path = "Target Support Files/Pods-quitsmoking/Pods-quitsmoking.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = quitsmoking/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		BF987C19F4D43CEF2CB425EA /* Pods-quitsmoking.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-quitsmoking.release.xcconfig"; path = "Target Support Files/Pods-quitsmoking/Pods-quitsmoking.release.xcconfig"; sourceTree = "<group>"; };
-		C3E00F5DEDD4D29B4C5FDC8C /* Pods-quitsmoking.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-quitsmoking.debug.xcconfig"; path = "Target Support Files/Pods-quitsmoking/Pods-quitsmoking.debug.xcconfig"; sourceTree = "<group>"; };
-		CA23C7FACACA6E116DA98EB5 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-quitsmoking/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		D2F89D481E24C2644B231A27 /* libPods-quitsmoking.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-quitsmoking.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = quitsmoking/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* quitsmoking-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "quitsmoking-Bridging-Header.h"; path = "quitsmoking/quitsmoking-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BFB00F8CFBD83C55CDD966C6 /* libPods-quitsmoking.a in Frameworks */,
+				C2CF24E6AEE99875714B18D7 /* libPods-quitsmoking.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,26 +53,36 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				8006D541D577A3AF38B2A0CF /* PrivacyInfo.xcprivacy */,
+				369D69BECEA546D5DA8E5A65 /* PrivacyInfo.xcprivacy */,
 			);
 			name = quitsmoking;
-			sourceTree = "<group>";
-		};
-		14B3EA4AC1808CB884F33010 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				99669613924673AB73777BF6 /* quitsmoking */,
-			);
-			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				8B4592258C602FBF0747D94E /* libPods-quitsmoking.a */,
+				D2F89D481E24C2644B231A27 /* libPods-quitsmoking.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4E542F68E85FDD970BDA45D0 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				AF2DCEC734439CF54854D761 /* quitsmoking */,
+			);
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
+		54D56513FBEE2AD6C274F0D1 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				55E4E02E64CAB476724AABB2 /* Pods-quitsmoking.debug.xcconfig */,
+				A08BD74D4DBBDF5FA72418AA /* Pods-quitsmoking.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -89,8 +99,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				B125EBD0C567DDEE74C96CC1 /* Pods */,
-				14B3EA4AC1808CB884F33010 /* ExpoModulesProviders */,
+				54D56513FBEE2AD6C274F0D1 /* Pods */,
+				4E542F68E85FDD970BDA45D0 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -105,22 +115,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		99669613924673AB73777BF6 /* quitsmoking */ = {
+		AF2DCEC734439CF54854D761 /* quitsmoking */ = {
 			isa = PBXGroup;
 			children = (
-				CA23C7FACACA6E116DA98EB5 /* ExpoModulesProvider.swift */,
+				31727AE334B2D4A4C123D4AD /* ExpoModulesProvider.swift */,
 			);
 			name = quitsmoking;
-			sourceTree = "<group>";
-		};
-		B125EBD0C567DDEE74C96CC1 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				C3E00F5DEDD4D29B4C5FDC8C /* Pods-quitsmoking.debug.xcconfig */,
-				BF987C19F4D43CEF2CB425EA /* Pods-quitsmoking.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "quitsmoking" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				A3185E577128F2B6621A889A /* [Expo] Configure project */,
+				410F8730060C423AF27FF0F1 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				047002F116107DA5C7134409 /* [CP] Embed Pods Frameworks */,
+				4F99D3E098B4A8631EB6F440 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				C9293C413DB72E9D1D966844 /* PrivacyInfo.xcprivacy in Resources */,
+				5B765006395DE3DC68F2B161 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -220,28 +220,6 @@
 			shellPath = /bin/sh;
 			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
 		};
-		047002F116107DA5C7134409 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-quitsmoking/Pods-quitsmoking-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-quitsmoking/Pods-quitsmoking-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 		08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -262,6 +240,52 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		410F8730060C423AF27FF0F1 /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/quitsmoking/quitsmoking.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-quitsmoking/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-quitsmoking/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-quitsmoking/expo-configure-project.sh\"\n";
+		};
+		4F99D3E098B4A8631EB6F440 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-quitsmoking/Pods-quitsmoking-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-quitsmoking/Pods-quitsmoking-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
@@ -304,30 +328,6 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-quitsmoking/Pods-quitsmoking-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		A3185E577128F2B6621A889A /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/quitsmoking/quitsmoking.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-quitsmoking/expo-configure-project.sh",
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-quitsmoking/ExpoModulesProvider.swift",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-quitsmoking/expo-configure-project.sh\"\n";
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -336,7 +336,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				D91A8D3983FF46352105BA25 /* ExpoModulesProvider.swift in Sources */,
+				CC016DDED75442FCD7745B8A /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,7 +345,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = C3E00F5DEDD4D29B4C5FDC8C /* Pods-quitsmoking.debug.xcconfig */;
+			baseConfigurationReference = 55E4E02E64CAB476724AABB2 /* Pods-quitsmoking.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -381,7 +381,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = BF987C19F4D43CEF2CB425EA /* Pods-quitsmoking.release.xcconfig */;
+			baseConfigurationReference = A08BD74D4DBBDF5FA72418AA /* Pods-quitsmoking.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;

@@ -13,38 +13,34 @@ import {
 import type { PurchasesPackage } from "react-native-purchases";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const ENTITLEMENT_ID = "QuitSmoke Pro";
+
 export default function SubscriptionPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [subscriptionPackage, setSubscriptionPackage] =
     useState<PurchasesPackage | null>(null);
-  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
 
   useEffect(() => {
     checkSubscription();
     loadOfferings();
   }, []);
 
-  useEffect(() => {
-    if (hasActiveSubscription) {
-      // If user has active subscription, navigate to home
-      router.replace("/(tabs)/home");
-    }
-  }, [hasActiveSubscription]);
-
-  useEffect(() => {
-    console.log(
-      "Subscription Package:",
-      JSON.stringify(subscriptionPackage, null, 2),
-    );
-  }, [subscriptionPackage]);
   const checkSubscription = async () => {
-    const isActive = await PurchaseService.checkSubscriptionStatus();
-    setHasActiveSubscription(isActive);
-    if (isActive) {
-      // User already has subscription, navigate to home
-      router.replace("/(tabs)/home");
+    try {
+      const customerInfo = await PurchaseService.getCustomerInfo();
+      console.log("Customer Info:", JSON.stringify(customerInfo, null, 2));
+      if (
+        customerInfo &&
+        typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== "undefined"
+      ) {
+        router.replace("/(tabs)/home");
+      }
+      // access latest customerInfo
+    } catch (e) {
+      // Error fetching customer info
+      Alert.alert("Error", "Failed to fetch customer information.");
     }
   };
 
@@ -145,11 +141,6 @@ export default function SubscriptionPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSkip = () => {
-    // Allow user to skip subscription for now
-    router.replace("/(tabs)/home");
   };
 
   return (
