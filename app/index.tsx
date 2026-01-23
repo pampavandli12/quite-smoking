@@ -1,7 +1,13 @@
 import PurchaseService from "@/services/purchases";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import {
   Button,
   Divider,
@@ -21,6 +27,7 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState(false);
   const [subscriptionPackage, setSubscriptionPackage] =
     useState<PurchasesPackage | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     checkSubscription();
@@ -35,6 +42,7 @@ export default function SubscriptionPage() {
         customerInfo &&
         typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== "undefined"
       ) {
+        setChecking(false);
         router.replace("/(tabs)/home");
       }
       // access latest customerInfo
@@ -142,7 +150,23 @@ export default function SubscriptionPage() {
       setLoading(false);
     }
   };
-
+  // Show loading indicator while checking subscription status
+  if (checking) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.loadingContainer,
+          { backgroundColor: theme.colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text variant="bodyLarge" style={styles.loadingText}>
+          Checking subscription status...
+        </Text>
+      </View>
+    );
+  }
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -464,5 +488,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     opacity: 0.6,
     paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
   },
 });
