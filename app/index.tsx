@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   View,
@@ -19,6 +20,7 @@ import {
 import type { PurchasesPackage } from "react-native-purchases";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const PAYWALL_BYPASS = true;
 const ENTITLEMENT_ID = "QuitSmoke Pro";
 
 export default function SubscriptionPage() {
@@ -30,6 +32,10 @@ export default function SubscriptionPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    if (PAYWALL_BYPASS) {
+      router.replace("/(tabs)/home");
+      return;
+    }
     checkSubscription();
     loadOfferings();
   }, []);
@@ -38,15 +44,15 @@ export default function SubscriptionPage() {
     try {
       const customerInfo = await PurchaseService.getCustomerInfo();
       console.log("Customer Info:", JSON.stringify(customerInfo, null, 2));
+      setChecking(false);
       if (
         customerInfo &&
         typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== "undefined"
       ) {
-        setChecking(false);
         router.replace("/(tabs)/home");
       }
-      // access latest customerInfo
     } catch (e) {
+      setChecking(false);
       // Error fetching customer info
       Alert.alert("Error", "Failed to fetch customer information.");
     }
@@ -167,6 +173,12 @@ export default function SubscriptionPage() {
       </View>
     );
   }
+  const redirectToPrivacyPolicy = () => {
+    const url = "https://pampavandli12.github.io/quit-smoking-privacy/";
+    Linking.openURL(url).catch((err) =>
+      console.error("Failed to open URL:", err),
+    );
+  };
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -344,6 +356,16 @@ export default function SubscriptionPage() {
         Skip for now
       </Button> */}
 
+      {/* privacy policy */}
+      <Button
+        mode="text"
+        style={styles.restoreButton}
+        textColor={theme.colors.secondary}
+        onPress={redirectToPrivacyPolicy}
+        disabled={loading}
+      >
+        Privacy Policy
+      </Button>
       {/* Terms */}
       <Text variant="bodySmall" style={styles.terms}>
         By continuing, you agree to our Terms of Service and Privacy Policy.

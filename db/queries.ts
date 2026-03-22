@@ -15,7 +15,7 @@ export async function logSmokingEvent(triggers: string[] = []) {
         triggers.map((trigger) => ({
           logId,
           trigger,
-        }))
+        })),
       );
     }
 
@@ -78,7 +78,7 @@ export async function getSmokingLogsWithTriggers() {
 // Get smoking count for a specific date range
 export async function getSmokingCountByDateRange(
   startDate: string,
-  endDate: string
+  endDate: string,
 ) {
   try {
     const logs = db.select().from(smokingLog).all();
@@ -143,7 +143,7 @@ export async function getWeekStats() {
 
     const count = await getSmokingCountByDateRange(
       startOfWeek.toISOString(),
-      endOfWeek.toISOString()
+      endOfWeek.toISOString(),
     );
     return count;
   } catch (error) {
@@ -208,7 +208,7 @@ export async function getYesterdayStats() {
     yesterday.setDate(yesterday.getDate() - 1);
     const startOfDay = new Date(yesterday.setHours(0, 0, 0, 0)).toISOString();
     const endOfDay = new Date(
-      yesterday.setHours(23, 59, 59, 999)
+      yesterday.setHours(23, 59, 59, 999),
     ).toISOString();
 
     const count = await getSmokingCountByDateRange(startOfDay, endOfDay);
@@ -233,7 +233,7 @@ export async function getPreviousWeekStats() {
 
     const count = await getSmokingCountByDateRange(
       startOfLastWeek.toISOString(),
-      endOfLastWeek.toISOString()
+      endOfLastWeek.toISOString(),
     );
     return count;
   } catch (error) {
@@ -310,7 +310,7 @@ export async function getMonthlyBreakdown() {
     logs.forEach((log) => {
       const logDate = new Date(log.timestamp);
       const daysDiff = Math.floor(
-        (today.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24)
+        (today.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24),
       );
 
       if (daysDiff >= 0 && daysDiff < 30) {
@@ -441,12 +441,12 @@ export async function getLast3DaysBreakdown() {
       const todayStart = new Date(
         today.getFullYear(),
         today.getMonth(),
-        today.getDate()
+        today.getDate(),
       );
       const logStart = new Date(
         logDate.getFullYear(),
         logDate.getMonth(),
-        logDate.getDate()
+        logDate.getDate(),
       );
 
       // Calculate days difference

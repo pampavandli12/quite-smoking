@@ -6,13 +6,26 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "PAYWALL_BYPASS": "true"
+      }
     },
     "preview": {
       "distribution": "internal"
     },
+    "closedTest": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "env": {
+        "PAYWALL_BYPASS": "true"
+      }
+    },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "PAYWALL_BYPASS": "false"
+      }
     }
   },
   "submit": {

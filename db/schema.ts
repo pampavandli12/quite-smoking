@@ -3,9 +3,9 @@ import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const smokingLog = sqliteTable("smoking_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  timestamp: text("timestamp")
+  timestamp: integer("timestamp")
     .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+    .default(sql`(cast(strftime('%s', 'now') as integer) * 1000)`),
 });
 
 export const smokingLogTriggers = sqliteTable("smoking_log_triggers", {

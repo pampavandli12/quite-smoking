@@ -16,7 +16,6 @@ import {
   Card,
   Chip,
   Icon,
-  IconButton,
   SegmentedButtons,
   Surface,
   Text,
@@ -191,11 +190,11 @@ export default function HomePage() {
           <Text variant="headlineSmall" style={styles.headerTitle}>
             Smoke Track
           </Text>
-          <IconButton
+          {/* <IconButton
             icon="account-circle-outline"
             size={28}
             onPress={() => {}}
-          />
+          /> */}
         </Surface>
 
         {/* Today's Count Card */}
