@@ -24,6 +24,7 @@ export default ({ config }) => ({
       predictiveBackGestureEnabled: false,
       package: "com.pampapathi.quitsmoking",
     },
+    assets: ["./assets/quitSmoking.db"],
 
     web: {
       output: "static",

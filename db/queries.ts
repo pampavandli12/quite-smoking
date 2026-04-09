@@ -1,10 +1,12 @@
 import { eq } from "drizzle-orm";
-import { db } from "./client";
+import { getDbAsync } from "./client";
 import { smokingLog, smokingLogTriggers } from "./schema";
 
 // Insert a smoking log entry
 export async function logSmokingEvent(triggers: string[] = []) {
   try {
+    const db = await getDbAsync();
+
     // Insert into smoking_log
     const result = await db.insert(smokingLog).values({}).returning();
     const logId = result[0].id;
@@ -29,6 +31,7 @@ export async function logSmokingEvent(triggers: string[] = []) {
 // Get all smoking logs
 export async function getAllSmokingLogs() {
   try {
+    const db = await getDbAsync();
     const logs = db.select().from(smokingLog).all();
     return logs;
   } catch (error) {
@@ -40,6 +43,7 @@ export async function getAllSmokingLogs() {
 // Get smoking logs with triggers
 export async function getSmokingLogsWithTriggers() {
   try {
+    const db = await getDbAsync();
     const logs = db
       .select({
         id: smokingLog.id,
@@ -81,6 +85,7 @@ export async function getSmokingCountByDateRange(
   endDate: string,
 ) {
   try {
+    const db = await getDbAsync();
     const logs = db.select().from(smokingLog).all();
 
     // Filter in JavaScript since expo-sqlite doesn't support complex where clauses well
@@ -99,10 +104,10 @@ export async function getSmokingCountByDateRange(
 // Delete a smoking log entry
 export async function deleteSmokingLog(logId: number) {
   try {
+    const db = await getDbAsync();
+
     // Delete triggers first (foreign key constraint)
-    await db
-      .delete(smokingLogTriggers)
-      .where(eq(smokingLogTriggers.logId, logId));
+    await db.delete(smokingLogTriggers).where(eq(smokingLogTriggers.logId, logId));
 
     // Delete the log
     await db.delete(smokingLog).where(eq(smokingLog.id, logId));
@@ -155,6 +160,7 @@ export async function getWeekStats() {
 // Get daily breakdown for the week
 export async function getWeeklyBreakdown() {
   try {
+    const db = await getDbAsync();
     const today = new Date();
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
@@ -183,6 +189,7 @@ export async function getWeeklyBreakdown() {
 // Get today's logs with timestamps
 export async function getTodayLogs() {
   try {
+    const db = await getDbAsync();
     const today = new Date();
     const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
     const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
@@ -245,6 +252,7 @@ export async function getPreviousWeekStats() {
 // Get detailed daily breakdown with dates
 export async function getDetailedWeeklyBreakdown() {
   try {
+    const db = await getDbAsync();
     const today = new Date();
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
@@ -299,6 +307,7 @@ export async function getDetailedWeeklyBreakdown() {
 // Get monthly breakdown (30 days)
 export async function getMonthlyBreakdown() {
   try {
+    const db = await getDbAsync();
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(today.getDate() - 30);
@@ -328,6 +337,7 @@ export async function getMonthlyBreakdown() {
 // Get yearly breakdown (12 months)
 export async function getYearlyBreakdown() {
   try {
+    const db = await getDbAsync();
     const today = new Date();
     const logs = db.select().from(smokingLog).all();
 
@@ -354,6 +364,7 @@ export async function getYearlyBreakdown() {
 // Get top trigger from the last 7 days
 export async function getTopTrigger() {
   try {
+    const db = await getDbAsync();
     const today = new Date();
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
@@ -394,6 +405,7 @@ export async function getTopTrigger() {
 // Get top 5 triggers from the last 7 days
 export async function getTop5Triggers() {
   try {
+    const db = await getDbAsync();
     const today = new Date();
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
@@ -430,6 +442,7 @@ export async function getTop5Triggers() {
 // Get last 3 days breakdown
 export async function getLast3DaysBreakdown() {
   try {
+    const db = await getDbAsync();
     const today = new Date();
     const logs = db.select().from(smokingLog).all();
 
