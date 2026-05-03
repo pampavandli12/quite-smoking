@@ -1,6 +1,9 @@
-import PurchaseService from "@/services/purchases";
-import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import PurchaseService, {
+  REVENUECAT_ENTITLEMENT_ID,
+} from '@/services/purchases';
+import Constants from 'expo-constants';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
-} from "react-native";
+} from 'react-native';
 import {
   Button,
   Divider,
@@ -16,13 +19,12 @@ import {
   Surface,
   Text,
   useTheme,
-} from "react-native-paper";
-import type { PurchasesPackage } from "react-native-purchases";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+} from 'react-native-paper';
+import type { PurchasesPackage } from 'react-native-purchases';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const PAYWALL_BYPASS = true;
-const ENTITLEMENT_ID = "QuitSmoke Pro";
-
+const PAYWALL_BYPASS =
+  Constants.expoConfig?.extra?.PAYWALL_BYPASS === 'true';
 export default function SubscriptionPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -33,7 +35,7 @@ export default function SubscriptionPage() {
 
   useEffect(() => {
     if (PAYWALL_BYPASS) {
-      router.replace("/(tabs)/home");
+      router.replace('/(tabs)/home');
       return;
     }
     checkSubscription();
@@ -43,18 +45,19 @@ export default function SubscriptionPage() {
   const checkSubscription = async () => {
     try {
       const customerInfo = await PurchaseService.getCustomerInfo();
-      console.log("Customer Info:", JSON.stringify(customerInfo, null, 2));
+      console.log('Customer Info:', JSON.stringify(customerInfo, null, 2));
       setChecking(false);
       if (
         customerInfo &&
-        typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== "undefined"
+        typeof customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !==
+          'undefined'
       ) {
-        router.replace("/(tabs)/home");
+        router.replace('/(tabs)/home');
       }
-    } catch (e) {
+    } catch {
       setChecking(false);
       // Error fetching customer info
-      Alert.alert("Error", "Failed to fetch customer information.");
+      Alert.alert('Error', 'Failed to fetch customer information.');
     }
   };
 
@@ -68,21 +71,21 @@ export default function SubscriptionPage() {
         setSubscriptionPackage(monthlyPackage);
       }
     } catch (error) {
-      console.error("Error loading offerings:", error);
+      console.error('Error loading offerings:', error);
     }
   };
 
   const priceString = useCallback(() => {
-    if (!subscriptionPackage) return "";
+    if (!subscriptionPackage) return '';
     const price = subscriptionPackage.product.priceString;
-    const period = "monthly"; // Assuming monthly for simplicity
+    const period = 'monthly'; // Assuming monthly for simplicity
     return `${price}/${period}`;
   }, [subscriptionPackage]);
   const handleSubscribe = async () => {
     if (!subscriptionPackage) {
       Alert.alert(
-        "Not Available",
-        "Subscription packages are not available at the moment. Please try again later.",
+        'Not Available',
+        'Subscription packages are not available at the moment. Please try again later.',
       );
       return;
     }
@@ -93,21 +96,21 @@ export default function SubscriptionPage() {
         await PurchaseService.purchasePackage(subscriptionPackage);
 
       if (success && customerInfo) {
-        Alert.alert("Success!", "Welcome to Premium! 🎉", [
+        Alert.alert('Success!', 'Welcome to Premium! 🎉', [
           {
-            text: "Continue",
-            onPress: () => router.replace("/(tabs)/home"),
+            text: 'Continue',
+            onPress: () => router.replace('/(tabs)/home'),
           },
         ]);
       } else if (error && !error.userCancelled) {
         Alert.alert(
-          "Purchase Failed",
-          "Something went wrong. Please try again.",
+          'Purchase Failed',
+          'Something went wrong. Please try again.',
         );
       }
     } catch (error) {
-      console.error("Purchase error:", error);
-      Alert.alert("Error", "An unexpected error occurred. Please try again.");
+      console.error('Purchase error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -126,32 +129,34 @@ export default function SubscriptionPage() {
         if (isMock) {
           // In mock mode, just show a message
           Alert.alert(
-            "Mock Mode",
-            "Running in development mode. No purchases to restore.",
+            'Mock Mode',
+            'Running in development mode. No purchases to restore.',
           );
         } else {
           const hasEntitlement =
-            typeof customerInfo.entitlements?.active?.["premium"] !==
-            "undefined";
+            typeof customerInfo.entitlements?.active?.[
+              REVENUECAT_ENTITLEMENT_ID
+            ] !==
+            'undefined';
 
           if (hasEntitlement) {
-            Alert.alert("Success!", "Your purchase has been restored! 🎉", [
+            Alert.alert('Success!', 'Your purchase has been restored! 🎉', [
               {
-                text: "Continue",
-                onPress: () => router.replace("/(tabs)/home"),
+                text: 'Continue',
+                onPress: () => router.replace('/(tabs)/home'),
               },
             ]);
           } else {
             Alert.alert(
-              "No Purchases Found",
+              'No Purchases Found',
               "We couldn't find any previous purchases to restore.",
             );
           }
         }
       }
     } catch (error) {
-      console.error("Restore error:", error);
-      Alert.alert("Error", "Failed to restore purchases. Please try again.");
+      console.error('Restore error:', error);
+      Alert.alert('Error', 'Failed to restore purchases. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -166,17 +171,17 @@ export default function SubscriptionPage() {
           { backgroundColor: theme.colors.background },
         ]}
       >
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text variant="bodyLarge" style={styles.loadingText}>
+        <ActivityIndicator size='large' color={theme.colors.primary} />
+        <Text variant='bodyLarge' style={styles.loadingText}>
           Checking subscription status...
         </Text>
       </View>
     );
   }
   const redirectToPrivacyPolicy = () => {
-    const url = "https://pampavandli12.github.io/quit-smoking-privacy/";
+    const url = 'https://pampavandli12.github.io/quit-smoking-privacy/';
     Linking.openURL(url).catch((err) =>
-      console.error("Failed to open URL:", err),
+      console.error('Failed to open URL:', err),
     );
   };
   return (
@@ -201,10 +206,10 @@ export default function SubscriptionPage() {
 
       {/* Title Section */}
       <Surface style={styles.titleSection} elevation={0}>
-        <Text variant="headlineMedium" style={styles.title}>
+        <Text variant='headlineMedium' style={styles.title}>
           Try Premium Free for 7 Days
         </Text>
-        <Text variant="bodyLarge" style={styles.subtitle}>
+        <Text variant='bodyLarge' style={styles.subtitle}>
           Cancel anytime, no commitment
         </Text>
       </Surface>
@@ -213,53 +218,53 @@ export default function SubscriptionPage() {
 
       {/* What You'll Get Section */}
       <Surface style={styles.section} elevation={0}>
-        <Text variant="titleLarge" style={styles.sectionTitle}>
-          What You'll Get
+        <Text variant='titleLarge' style={styles.sectionTitle}>
+          What You&apos;ll Get
         </Text>
 
         <Surface style={styles.featureItem} elevation={0}>
-          <Icon source="check-circle" size={24} color="#4CAF50" />
+          <Icon source='check-circle' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant="bodyLarge" style={styles.featureTitle}>
+            <Text variant='bodyLarge' style={styles.featureTitle}>
               Unlimited Access
             </Text>
-            <Text variant="bodyMedium" style={styles.featureDescription}>
+            <Text variant='bodyMedium' style={styles.featureDescription}>
               Access all premium features and content
             </Text>
           </Surface>
         </Surface>
 
         <Surface style={styles.featureItem} elevation={0}>
-          <Icon source="check-circle" size={24} color="#4CAF50" />
+          <Icon source='check-circle' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant="bodyLarge" style={styles.featureTitle}>
+            <Text variant='bodyLarge' style={styles.featureTitle}>
               Ad-Free Experience
             </Text>
-            <Text variant="bodyMedium" style={styles.featureDescription}>
+            <Text variant='bodyMedium' style={styles.featureDescription}>
               Enjoy uninterrupted usage without ads
             </Text>
           </Surface>
         </Surface>
 
         <Surface style={styles.featureItem} elevation={0}>
-          <Icon source="check-circle" size={24} color="#4CAF50" />
+          <Icon source='check-circle' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant="bodyLarge" style={styles.featureTitle}>
+            <Text variant='bodyLarge' style={styles.featureTitle}>
               Priority Support
             </Text>
-            <Text variant="bodyMedium" style={styles.featureDescription}>
+            <Text variant='bodyMedium' style={styles.featureDescription}>
               Get help from our dedicated support team
             </Text>
           </Surface>
         </Surface>
 
         <Surface style={styles.featureItem} elevation={0}>
-          <Icon source="check-circle" size={24} color="#4CAF50" />
+          <Icon source='check-circle' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant="bodyLarge" style={styles.featureTitle}>
+            <Text variant='bodyLarge' style={styles.featureTitle}>
               Offline Downloads
             </Text>
-            <Text variant="bodyMedium" style={styles.featureDescription}>
+            <Text variant='bodyMedium' style={styles.featureDescription}>
               Download content for offline viewing
             </Text>
           </Surface>
@@ -270,10 +275,10 @@ export default function SubscriptionPage() {
 
       {/* Pricing Section */}
       <Surface style={styles.pricingSection} elevation={0}>
-        <Text variant="displaySmall" style={styles.price}>
+        <Text variant='displaySmall' style={styles.price}>
           {priceString()}
         </Text>
-        <Text variant="bodyMedium" style={styles.priceSubtext}>
+        <Text variant='bodyMedium' style={styles.priceSubtext}>
           after 7-day free trial
         </Text>
       </Surface>
@@ -287,20 +292,20 @@ export default function SubscriptionPage() {
         elevation={0}
       >
         <Surface style={styles.benefitRow} elevation={0}>
-          <Icon source="check-circle" size={20} color="#4CAF50" />
-          <Text variant="bodyMedium" style={styles.benefitText}>
+          <Icon source='check-circle' size={20} color='#4CAF50' />
+          <Text variant='bodyMedium' style={styles.benefitText}>
             7 days completely free
           </Text>
         </Surface>
         <Surface style={styles.benefitRow} elevation={0}>
-          <Icon source="check-circle" size={20} color="#4CAF50" />
-          <Text variant="bodyMedium" style={styles.benefitText}>
+          <Icon source='check-circle' size={20} color='#4CAF50' />
+          <Text variant='bodyMedium' style={styles.benefitText}>
             Cancel anytime
           </Text>
         </Surface>
         <Surface style={styles.benefitRow} elevation={0}>
-          <Icon source="check-circle" size={20} color="#4CAF50" />
-          <Text variant="bodyMedium" style={styles.benefitText}>
+          <Icon source='check-circle' size={20} color='#4CAF50' />
+          <Text variant='bodyMedium' style={styles.benefitText}>
             Full access to all features
           </Text>
         </Surface>
@@ -315,8 +320,8 @@ export default function SubscriptionPage() {
           <Icon source="cash" size={24} color={theme.colors.onSurface} />
         </Surface> */}
         <Surface style={styles.secureRow} elevation={0}>
-          <Icon source="lock" size={16} color={theme.colors.onSurfaceVariant} />
-          <Text variant="bodySmall" style={styles.secureText}>
+          <Icon source='lock' size={16} color={theme.colors.onSurfaceVariant} />
+          <Text variant='bodySmall' style={styles.secureText}>
             Secure payment processing
           </Text>
         </Surface>
@@ -324,19 +329,19 @@ export default function SubscriptionPage() {
 
       {/* CTA Button */}
       <Button
-        mode="contained"
+        mode='contained'
         style={styles.ctaButton}
         contentStyle={styles.ctaButtonContent}
         onPress={handleSubscribe}
         loading={loading}
         disabled={loading}
       >
-        {loading ? "Processing..." : "Start 7-Day Free Trial"}
+        {loading ? 'Processing...' : 'Start 7-Day Free Trial'}
       </Button>
 
       {/* Restore Purchase Button */}
       <Button
-        mode="text"
+        mode='text'
         style={styles.restoreButton}
         textColor={theme.colors.secondary}
         onPress={handleRestore}
@@ -358,7 +363,7 @@ export default function SubscriptionPage() {
 
       {/* privacy policy */}
       <Button
-        mode="text"
+        mode='text'
         style={styles.restoreButton}
         textColor={theme.colors.secondary}
         onPress={redirectToPrivacyPolicy}
@@ -367,7 +372,7 @@ export default function SubscriptionPage() {
         Privacy Policy
       </Button>
       {/* Terms */}
-      <Text variant="bodySmall" style={styles.terms}>
+      <Text variant='bodySmall' style={styles.terms}>
         By continuing, you agree to our Terms of Service and Privacy Policy.
         Subscription automatically renews unless cancelled at least 24 hours
         before the end of the trial period.
@@ -385,31 +390,31 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   headerImageContainer: {
-    width: "100%",
+    width: '100%',
     borderRadius: 12,
-    overflow: "hidden",
+    overflow: 'hidden',
     marginBottom: 24,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   headerImagePlaceholder: {
-    width: "100%",
+    width: '100%',
     height: 180,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 12,
   },
   titleSection: {
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 16,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   title: {
-    fontWeight: "bold",
-    textAlign: "center",
+    fontWeight: 'bold',
+    textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    textAlign: "center",
+    textAlign: 'center',
     opacity: 0.7,
   },
   divider: {
@@ -417,37 +422,37 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 16,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   sectionTitle: {
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 20,
   },
   featureItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: 20,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   featureTextContainer: {
     flex: 1,
     marginLeft: 12,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   featureTitle: {
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 4,
   },
   featureDescription: {
     opacity: 0.7,
   },
   pricingSection: {
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 20,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   price: {
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginBottom: 4,
   },
   priceSubtext: {
@@ -455,8 +460,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   savings: {
-    color: "#4CAF50",
-    fontWeight: "600",
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   benefitsCard: {
     padding: 16,
@@ -464,30 +469,30 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   benefitRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   benefitText: {
     marginLeft: 12,
   },
   paymentSection: {
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 24,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   paymentIcons: {
-    flexDirection: "row",
-    justifyContent: "center",
+    flexDirection: 'row',
+    justifyContent: 'center',
     gap: 16,
     marginBottom: 12,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   secureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "transparent",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   secureText: {
     marginLeft: 6,
@@ -507,14 +512,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   terms: {
-    textAlign: "center",
+    textAlign: 'center',
     opacity: 0.6,
     paddingHorizontal: 20,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: 16,

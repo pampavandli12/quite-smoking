@@ -1,20 +1,23 @@
-import Constants from "expo-constants";
-import { Platform } from "react-native";
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import Purchases, {
   CustomerInfo,
   PurchasesOffering,
   PurchasesPackage,
-} from "react-native-purchases";
+} from 'react-native-purchases';
 
 // Check if running in Expo Go
-const isExpoGo = Constants.appOwnership === "expo";
+const isExpoGo = Constants.appOwnership === 'expo';
 
 // RevenueCat API Keys
 // For Expo Go testing, use the Test Store API key from https://rev.cat/sdk-test-store
 const REVENUECAT_API_KEY = Platform.select({
-  ios: "appl_YOUR_IOS_API_KEY_HERE",
-  android: "goog_FLoWBujNJyaCqMBVQnvncXUMorF",
+  ios: 'appl_YOUR_IOS_API_KEY_HERE',
+  android: 'goog_FLoWBujNJyaCqMBVQnvncXUMorF', // NOTE: Production API key for Android (from RevenueCat dashboard)
+  //android: 'test_rGcJzBvPICvxCewJbeUyPjmGKeO', // NOTE: Test revenuecat API key for Android (from RevenueCat dashboard)
 });
+
+export const REVENUECAT_ENTITLEMENT_ID = 'QuitSmoke Pro';
 
 class PurchaseService {
   private static instance: PurchaseService;
@@ -38,10 +41,10 @@ class PurchaseService {
     // If running in Expo Go without proper keys, enable mock mode
     if (
       isExpoGo &&
-      (!REVENUECAT_API_KEY || REVENUECAT_API_KEY.includes("YOUR"))
+      (!REVENUECAT_API_KEY || REVENUECAT_API_KEY.includes('YOUR'))
     ) {
       console.warn(
-        "Running in Expo Go without RevenueCat keys - using mock mode",
+        'Running in Expo Go without RevenueCat keys - using mock mode',
       );
       this.mockMode = true;
       this.isConfigured = true;
@@ -49,7 +52,7 @@ class PurchaseService {
     }
 
     if (!REVENUECAT_API_KEY) {
-      console.warn("RevenueCat API key not configured - using mock mode");
+      console.warn('RevenueCat API key not configured - using mock mode');
       this.mockMode = true;
       this.isConfigured = true;
       return;
@@ -67,15 +70,15 @@ class PurchaseService {
       }
 
       this.isConfigured = true;
-      console.log("RevenueCat initialized successfully");
+      console.log('RevenueCat initialized successfully');
     } catch (error: any) {
-      console.error("Failed to initialize RevenueCat:", error);
+      console.error('Failed to initialize RevenueCat:', error);
       // If initialization fails, fall back to mock mode
       if (
-        error.message?.includes("Expo Go") ||
-        error.message?.includes("native store")
+        error.message?.includes('Expo Go') ||
+        error.message?.includes('native store')
       ) {
-        console.warn("Falling back to mock mode for Expo Go");
+        console.warn('Falling back to mock mode for Expo Go');
         this.mockMode = true;
         this.isConfigured = true;
       }
@@ -87,12 +90,12 @@ class PurchaseService {
    */
   async getOfferings(): Promise<PurchasesOffering | null> {
     if (this.mockMode) {
-      console.log("Mock mode: Returning mock offering");
+      console.log('Mock mode: Returning mock offering');
       return null; // Return null in mock mode
     }
 
     if (!this.isConfigured) {
-      console.warn("Purchases not configured");
+      console.warn('Purchases not configured');
       return null;
     }
 
@@ -103,7 +106,7 @@ class PurchaseService {
       }
       return null;
     } catch (error) {
-      console.error("Error fetching offerings:", error);
+      console.error('Error fetching offerings:', error);
       return null;
     }
   }
@@ -115,7 +118,7 @@ class PurchaseService {
     packageToPurchase: PurchasesPackage,
   ): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: any }> {
     if (this.mockMode) {
-      console.log("Mock mode: Simulating successful purchase");
+      console.log('Mock mode: Simulating successful purchase');
       // Simulate successful purchase in mock mode
       return { success: true, customerInfo: {} as CustomerInfo };
     }
@@ -123,7 +126,7 @@ class PurchaseService {
     if (!this.isConfigured) {
       return {
         success: false,
-        error: { message: "Purchases not configured" },
+        error: { message: 'Purchases not configured' },
       };
     }
 
@@ -133,7 +136,7 @@ class PurchaseService {
       return { success: true, customerInfo };
     } catch (error: any) {
       if (!error.userCancelled) {
-        console.error("Purchase error:", error);
+        console.error('Purchase error:', error);
       }
       return { success: false, error };
     }
@@ -148,7 +151,7 @@ class PurchaseService {
     error?: any;
   }> {
     if (this.mockMode) {
-      console.log("Mock mode: No purchases to restore");
+      console.log('Mock mode: No purchases to restore');
       return {
         success: true,
         customerInfo: {} as CustomerInfo,
@@ -158,7 +161,7 @@ class PurchaseService {
     if (!this.isConfigured) {
       return {
         success: false,
-        error: { message: "Purchases not configured" },
+        error: { message: 'Purchases not configured' },
       };
     }
 
@@ -166,7 +169,7 @@ class PurchaseService {
       const customerInfo = await Purchases.restorePurchases();
       return { success: true, customerInfo };
     } catch (error) {
-      console.error("Restore error:", error);
+      console.error('Restore error:', error);
       return { success: false, error };
     }
   }
@@ -176,7 +179,7 @@ class PurchaseService {
    */
   async checkSubscriptionStatus(): Promise<boolean> {
     if (this.mockMode) {
-      console.log("Mock mode: Returning false for subscription status");
+      console.log('Mock mode: Returning false for subscription status');
       return false; // No subscription in mock mode
     }
 
@@ -186,9 +189,12 @@ class PurchaseService {
 
     try {
       const customerInfo = await Purchases.getCustomerInfo();
-      return typeof customerInfo.entitlements.active["premium"] !== "undefined";
+      return (
+        typeof customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !==
+        'undefined'
+      );
     } catch (error) {
-      console.error("Error checking subscription:", error);
+      console.error('Error checking subscription:', error);
       return false;
     }
   }
@@ -204,7 +210,7 @@ class PurchaseService {
     try {
       return await Purchases.getCustomerInfo();
     } catch (error) {
-      console.error("Error getting customer info:", error);
+      console.error('Error getting customer info:', error);
       return null;
     }
   }
@@ -220,7 +226,7 @@ class PurchaseService {
     try {
       await Purchases.logIn(userId);
     } catch (error) {
-      console.error("Error logging in:", error);
+      console.error('Error logging in:', error);
     }
   }
 
@@ -235,7 +241,7 @@ class PurchaseService {
     try {
       await Purchases.logOut();
     } catch (error) {
-      console.error("Error logging out:", error);
+      console.error('Error logging out:', error);
     }
   }
 

@@ -1,50 +1,113 @@
-# Welcome to your Expo app 👋
+# Quit Smoking
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo React Native app for tracking smoking logs, triggers, and progress stats.
 
-## Get started
+## Setup
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Install dependencies:
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Local Android Development
 
-## Learn more
+This project uses a development build because it includes native modules such as RevenueCat purchases.
 
-To learn more about developing your project with Expo, look at the following resources:
+### Run locally with paywall bypass enabled
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Use this when you want to skip the subscription screen while developing:
 
-## Join the community
+```bash
+PAYWALL_BYPASS=true npx expo run:android
+PAYWALL_BYPASS=true npm start
+```
 
-Join our community of developers creating universal apps.
+### Run locally with the real paywall
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Use this when you want production-like subscription behavior:
+
+```bash
+PAYWALL_BYPASS=false npx expo run:android
+PAYWALL_BYPASS=false npm start
+```
+
+If the app is already installed and you only need to restart Metro:
+
+```bash
+PAYWALL_BYPASS=true npm start -- --clear
+```
+
+or:
+
+```bash
+PAYWALL_BYPASS=false npm start -- --clear
+```
+
+`PAYWALL_BYPASS` is read through `app.config.js`, so restart Metro after changing the value.
+
+## EAS Builds
+
+EAS build profiles are configured in `eas.json`.
+
+### Development build
+
+Creates an internal development client build. This profile currently sets `PAYWALL_BYPASS=true`.
+
+```bash
+eas build --profile development --platform android
+```
+
+After installing the development build on an emulator/device, start Metro with the same bypass value:
+
+```bash
+PAYWALL_BYPASS=true npm start
+```
+
+### Closed testing build
+
+Creates a store-distributed build for closed testing:
+
+```bash
+eas build --profile closedTest --platform android
+```
+
+Note: if you want testers to validate the real Play Billing/RevenueCat flow, set `PAYWALL_BYPASS=false` for this profile before building.
+
+### Production build
+
+Creates a production Android build. This profile sets `PAYWALL_BYPASS=false`.
+
+```bash
+eas build --profile production --platform android
+```
+
+Submit the latest production build to Google Play:
+
+```bash
+eas submit --platform android
+```
+
+## Useful Checks
+
+Run TypeScript checks:
+
+```bash
+npx tsc --noEmit
+```
+
+Run lint:
+
+```bash
+npm run lint
+```
+
+## Paywall Configuration
+
+`PAYWALL_BYPASS` flow:
+
+1. `eas.json` or your shell sets `PAYWALL_BYPASS`.
+2. `app.config.js` exposes it through `expo.extra.PAYWALL_BYPASS`.
+3. `app/index.tsx` reads it with `expo-constants`.
+
+Use `PAYWALL_BYPASS=true` only for development/internal testing. Use `PAYWALL_BYPASS=false` for production and for any test build where purchases must be validated.
