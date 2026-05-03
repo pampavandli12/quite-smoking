@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1.8,
+    flex: 1,
     backgroundColor: 'transparent',
   },
   triggerProgressBarContainer: {
