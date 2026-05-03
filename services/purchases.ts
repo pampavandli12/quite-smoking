@@ -17,6 +17,8 @@ const REVENUECAT_API_KEY = Platform.select({
   //android: 'test_rGcJzBvPICvxCewJbeUyPjmGKeO', // NOTE: Test revenuecat API key for Android (from RevenueCat dashboard)
 });
 
+export const REVENUECAT_ENTITLEMENT_ID = 'QuitSmoke Pro';
+
 class PurchaseService {
   private static instance: PurchaseService;
   private isConfigured = false;
@@ -187,7 +189,10 @@ class PurchaseService {
 
     try {
       const customerInfo = await Purchases.getCustomerInfo();
-      return typeof customerInfo.entitlements.active['premium'] !== 'undefined';
+      return (
+        typeof customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !==
+        'undefined'
+      );
     } catch (error) {
       console.error('Error checking subscription:', error);
       return false;
