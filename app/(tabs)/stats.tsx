@@ -9,11 +9,11 @@ import {
   getWeekStats,
   getYearlyBreakdown,
   getYesterdayStats,
-} from "@/db";
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
-import { Dimensions, ScrollView, StyleSheet } from "react-native";
-import { LineChart } from "react-native-chart-kit";
+} from '@/db';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
 import {
   Card,
   Icon,
@@ -21,71 +21,71 @@ import {
   Surface,
   Text,
   useTheme,
-} from "react-native-paper";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+} from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function StatsPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const [selectedPeriod, setSelectedPeriod] = useState("week");
+  const [selectedPeriod, setSelectedPeriod] = useState('week');
   const [currentTotal, setCurrentTotal] = useState(0);
   const [previousTotal, setPreviousTotal] = useState(0);
   const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
   const [chartData, setChartData] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-  const [healthInsight, setHealthInsight] = useState("");
+  const [healthInsight, setHealthInsight] = useState('');
   const [todayCount, setTodayCount] = useState(0);
   const [yesterdayCount, setYesterdayCount] = useState(0);
   const [topTriggers, setTopTriggers] = useState<
     { trigger: string; count: number }[]
   >([]);
 
-  const screenWidth = Dimensions.get("window").width;
+  const screenWidth = Dimensions.get('window').width;
 
   // Health insight message generators
   const getProgressMessage = (today: number, yesterday: number) => {
     if (today < yesterday) {
-      return "Great job! You smoked fewer cigarettes today than yesterday 🎉";
+      return 'Great job! You smoked fewer cigarettes today than yesterday 🎉';
     } else if (today > yesterday) {
-      return "You smoked more today than yesterday. Think about what triggered it 💭";
+      return 'You smoked more today than yesterday. Think about what triggered it 💭';
     } else {
-      return "Consistent! You smoked the same as yesterday. Try to cut down tomorrow 💪";
+      return 'Consistent! You smoked the same as yesterday. Try to cut down tomorrow 💪';
     }
   };
 
   const getTriggerMessage = (trigger: string) => {
     switch (trigger) {
-      case "stress":
-        return "Stress seems to be your biggest trigger. Try deep breathing or a short walk instead 🧘";
-      case "coffee":
-        return "Coffee often makes you want to smoke. How about switching to tea once a day? ☕➡️🍵";
-      case "alcohol":
+      case 'stress':
+        return 'Stress seems to be your biggest trigger. Try deep breathing or a short walk instead 🧘';
+      case 'coffee':
+        return 'Coffee often makes you want to smoke. How about switching to tea once a day? ☕➡️🍵';
+      case 'alcohol':
         return "Alcohol is a strong trigger for smoking. Plan ahead if you're going out 🍺";
-      case "after meals":
-        return "Smoking after meals is common. Try brushing your teeth or chewing gum instead 🪥";
-      case "boredom":
-        return "Boredom is a sneaky trigger. Keep your hands busy with a quick hobby or game 🎮";
-      case "work pressure":
-        return "Work pressure often drives smoking. Step away for a 2-minute walk instead 🚶";
-      case "driving":
-        return "Driving can be a strong trigger. Keep sugar-free mints in your car 🚗";
-      case "phone scrolling / gaming":
-        return "Scrolling or gaming often pairs with smoking. Try short breaks without a cigarette 📱";
-      case "anxiety":
-        return "Anxiety can make you reach for cigarettes. Try a 5-minute meditation instead 🧘";
-      case "social situations":
-        return "Social situations can be tough. Plan your response ahead of time 👥";
+      case 'after meals':
+        return 'Smoking after meals is common. Try brushing your teeth or chewing gum instead 🪥';
+      case 'boredom':
+        return 'Boredom is a sneaky trigger. Keep your hands busy with a quick hobby or game 🎮';
+      case 'work pressure':
+        return 'Work pressure often drives smoking. Step away for a 2-minute walk instead 🚶';
+      case 'driving':
+        return 'Driving can be a strong trigger. Keep sugar-free mints in your car 🚗';
+      case 'phone scrolling / gaming':
+        return 'Scrolling or gaming often pairs with smoking. Try short breaks without a cigarette 📱';
+      case 'anxiety':
+        return 'Anxiety can make you reach for cigarettes. Try a 5-minute meditation instead 🧘';
+      case 'social situations':
+        return 'Social situations can be tough. Plan your response ahead of time 👥';
       default:
         return `Looks like "${trigger}" is your top trigger. Can you think of a healthy alternative? 💡`;
     }
   };
 
   const fallbackMessages = [
-    "Every cigarette skipped is a victory 🏆",
-    "Within 20 minutes of not smoking, your heart rate drops ❤️",
-    "Your lungs start to heal the moment you reduce smoking 🫁",
+    'Every cigarette skipped is a victory 🏆',
+    'Within 20 minutes of not smoking, your heart rate drops ❤️',
+    'Your lungs start to heal the moment you reduce smoking 🫁',
     "You're stronger than your cravings 💪",
-    "Small steps every day lead to big changes 🌟",
+    'Small steps every day lead to big changes 🌟',
   ];
 
   const getFallbackMessage = () => {
@@ -121,7 +121,7 @@ export default function StatsPage() {
       // Priority 3: Fallback message
       setHealthInsight(getFallbackMessage());
     } catch (error) {
-      console.error("Error generating health insight:", error);
+      console.error('Error generating health insight:', error);
       setHealthInsight(getFallbackMessage());
     }
   };
@@ -131,7 +131,7 @@ export default function StatsPage() {
     try {
       setLoading(true);
 
-      if (selectedPeriod === "week") {
+      if (selectedPeriod === 'week') {
         const [currentWeek, previousWeek, breakdown, weeklyData, triggers] =
           await Promise.all([
             getWeekStats(),
@@ -146,7 +146,7 @@ export default function StatsPage() {
         setDailyBreakdown(breakdown);
         setChartData(weeklyData);
         setTopTriggers(triggers);
-      } else if (selectedPeriod === "month") {
+      } else if (selectedPeriod === 'month') {
         const monthlyData = await getMonthlyBreakdown();
         const total = monthlyData.reduce((sum, val) => sum + val, 0);
         setCurrentTotal(total);
@@ -167,7 +167,7 @@ export default function StatsPage() {
       // Generate health insight
       await generateHealthInsight();
     } catch (error) {
-      console.error("Error loading stats:", error);
+      console.error('Error loading stats:', error);
     } finally {
       setLoading(false);
     }
@@ -181,32 +181,32 @@ export default function StatsPage() {
   useFocusEffect(
     useCallback(() => {
       loadStats();
-    }, [selectedPeriod])
+    }, [selectedPeriod]),
   );
 
   // Chart labels based on period
   const getChartLabels = () => {
-    if (selectedPeriod === "week") {
-      return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    } else if (selectedPeriod === "month") {
+    if (selectedPeriod === 'week') {
+      return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    } else if (selectedPeriod === 'month') {
       // Show every 5th day
       return Array.from({ length: 30 }, (_, i) =>
-        i % 5 === 0 ? `${i + 1}` : ""
+        i % 5 === 0 ? `${i + 1}` : '',
       );
     } else {
       return [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
     }
   };
@@ -230,20 +230,20 @@ export default function StatsPage() {
       const primary = theme.colors.primary;
       return `${primary}${Math.round(opacity * 255)
         .toString(16)
-        .padStart(2, "0")}`;
+        .padStart(2, '0')}`;
     },
     labelColor: (opacity = 1) => theme.colors.onSurface,
     strokeWidth: 3,
     propsForBackgroundLines: {
-      stroke: "transparent",
+      stroke: 'transparent',
     },
     propsForLabels: {
-      fontSize: selectedPeriod === "month" ? 10 : 11,
-      fontWeight: "400",
+      fontSize: selectedPeriod === 'month' ? 10 : 11,
+      fontWeight: '400',
     },
     propsForDots: {
-      r: "5",
-      strokeWidth: "3",
+      r: '5',
+      strokeWidth: '3',
       stroke: theme.colors.primary,
       fill: theme.colors.surface,
     },
@@ -251,9 +251,9 @@ export default function StatsPage() {
 
   // Calculate average based on period
   const getAverage = () => {
-    if (selectedPeriod === "week") {
+    if (selectedPeriod === 'week') {
       return currentTotal > 0 ? Math.round(currentTotal / 7) : 0;
-    } else if (selectedPeriod === "month") {
+    } else if (selectedPeriod === 'month') {
       return currentTotal > 0 ? Math.round(currentTotal / 30) : 0;
     } else {
       return currentTotal > 0 ? Math.round(currentTotal / 12) : 0;
@@ -270,19 +270,19 @@ export default function StatsPage() {
 
   // Get period label
   const getPeriodLabel = () => {
-    return selectedPeriod === "week"
-      ? "day"
-      : selectedPeriod === "month"
-      ? "day"
-      : "month";
+    return selectedPeriod === 'week'
+      ? 'day'
+      : selectedPeriod === 'month'
+        ? 'day'
+        : 'month';
   };
 
   const getComparisonLabel = () => {
-    return selectedPeriod === "week"
-      ? "last week"
-      : selectedPeriod === "month"
-      ? "last month"
-      : "last year";
+    return selectedPeriod === 'week'
+      ? 'last week'
+      : selectedPeriod === 'month'
+        ? 'last month'
+        : 'last year';
   };
 
   return (
@@ -296,10 +296,10 @@ export default function StatsPage() {
       <Surface style={styles.content} elevation={0}>
         {/* Header */}
         <Surface style={styles.header} elevation={0}>
-          <Text variant="headlineSmall" style={styles.headerTitle}>
+          <Text variant='headlineSmall' style={styles.headerTitle}>
             Smoking Statistics
           </Text>
-          <Text variant="bodyMedium" style={styles.headerSubtitle}>
+          <Text variant='bodyMedium' style={styles.headerSubtitle}>
             Track your progress
           </Text>
         </Surface>
@@ -310,9 +310,9 @@ export default function StatsPage() {
             value={selectedPeriod}
             onValueChange={setSelectedPeriod}
             buttons={[
-              { value: "week", label: "Week" },
-              { value: "month", label: "Month" },
-              { value: "year", label: "Year" },
+              { value: 'week', label: 'Week' },
+              { value: 'month', label: 'Month' },
+              { value: 'year', label: 'Year' },
             ]}
           />
         </Surface>
@@ -336,7 +336,7 @@ export default function StatsPage() {
             withHorizontalLabels={true}
             segments={4}
             fromZero
-            yAxisSuffix=""
+            yAxisSuffix=''
             onDataPointClick={(data) => {
               console.log(data);
             }}
@@ -347,41 +347,41 @@ export default function StatsPage() {
         <Surface style={styles.statsRow} elevation={0}>
           <Card style={styles.statCardHalf}>
             <Card.Content>
-              <Text variant="bodyMedium" style={styles.statLabel}>
-                {selectedPeriod === "week"
-                  ? "Daily"
-                  : selectedPeriod === "month"
-                  ? "Daily"
-                  : "Monthly"}{" "}
+              <Text variant='bodyMedium' style={styles.statLabel}>
+                {selectedPeriod === 'week'
+                  ? 'Daily'
+                  : selectedPeriod === 'month'
+                    ? 'Daily'
+                    : 'Monthly'}{' '}
                 Average
               </Text>
               <Surface style={styles.statValueRow} elevation={0}>
-                <Text variant="headlineLarge" style={styles.statNumber}>
+                <Text variant='headlineLarge' style={styles.statNumber}>
                   {average}
                 </Text>
-                <Text variant="bodyMedium">
-                  {" "}
-                  {average === 1 ? "cigarette" : "cigarettes"}
+                <Text variant='bodyMedium'>
+                  {' '}
+                  {average === 1 ? 'cigarette' : 'cigarettes'}
                 </Text>
               </Surface>
               {previousTotal > 0 && (
                 <Surface style={styles.changeRow} elevation={0}>
                   <Icon
                     source={
-                      percentageChange < 0 ? "trending-down" : "trending-up"
+                      percentageChange < 0 ? 'trending-down' : 'trending-up'
                     }
                     size={16}
-                    color={percentageChange < 0 ? "#4CAF50" : "#F44336"}
+                    color={percentageChange < 0 ? '#4CAF50' : '#F44336'}
                   />
                   <Text
-                    variant="bodySmall"
+                    variant='bodySmall'
                     style={
                       percentageChange < 0
                         ? styles.changeTextGreen
                         : styles.changeTextRed
                     }
                   >
-                    {percentageChange > 0 ? "+" : ""}
+                    {percentageChange > 0 ? '+' : ''}
                     {percentageChange}% vs {getComparisonLabel()}
                   </Text>
                 </Surface>
@@ -391,41 +391,41 @@ export default function StatsPage() {
 
           <Card style={styles.statCardHalf}>
             <Card.Content>
-              <Text variant="bodyMedium" style={styles.statLabel}>
-                Total This{" "}
-                {selectedPeriod === "week"
-                  ? "Week"
-                  : selectedPeriod === "month"
-                  ? "Month"
-                  : "Year"}
+              <Text variant='bodyMedium' style={styles.statLabel}>
+                Total This{' '}
+                {selectedPeriod === 'week'
+                  ? 'Week'
+                  : selectedPeriod === 'month'
+                    ? 'Month'
+                    : 'Year'}
               </Text>
               <Surface style={styles.statValueRow} elevation={0}>
-                <Text variant="headlineLarge" style={styles.statNumber}>
+                <Text variant='headlineLarge' style={styles.statNumber}>
                   {currentTotal}
                 </Text>
-                <Text variant="bodyMedium">
-                  {" "}
-                  {currentTotal === 1 ? "cigarette" : "cigarettes"}
+                <Text variant='bodyMedium'>
+                  {' '}
+                  {currentTotal === 1 ? 'cigarette' : 'cigarettes'}
                 </Text>
               </Surface>
               {previousTotal > 0 && (
                 <Surface style={styles.changeRow} elevation={0}>
                   <Icon
                     source={
-                      percentageChange < 0 ? "trending-down" : "trending-up"
+                      percentageChange < 0 ? 'trending-down' : 'trending-up'
                     }
                     size={16}
-                    color={percentageChange < 0 ? "#4CAF50" : "#F44336"}
+                    color={percentageChange < 0 ? '#4CAF50' : '#F44336'}
                   />
                   <Text
-                    variant="bodySmall"
+                    variant='bodySmall'
                     style={
                       percentageChange < 0
                         ? styles.changeTextGreen
                         : styles.changeTextRed
                     }
                   >
-                    {percentageChange > 0 ? "+" : ""}
+                    {percentageChange > 0 ? '+' : ''}
                     {percentageChange}% vs {getComparisonLabel()}
                   </Text>
                 </Surface>
@@ -435,12 +435,12 @@ export default function StatsPage() {
         </Surface>
 
         {/* Top Triggers - Only for week view */}
-        {selectedPeriod === "week" && topTriggers.length > 0 && (
+        {selectedPeriod === 'week' && topTriggers.length > 0 && (
           <Surface style={styles.section} elevation={0}>
-            <Text variant="titleLarge" style={styles.sectionTitle}>
+            <Text variant='titleLarge' style={styles.sectionTitle}>
               Top Triggers
             </Text>
-            <Text variant="bodyMedium" style={styles.sectionSubtitle}>
+            <Text variant='bodyMedium' style={styles.sectionSubtitle}>
               What makes you reach for a cigarette
             </Text>
 
@@ -449,11 +449,11 @@ export default function StatsPage() {
                 <Card.Content style={styles.triggerCardContent}>
                   <Surface style={styles.triggerLeft} elevation={0}>
                     <Surface style={styles.triggerRank} elevation={0}>
-                      <Text variant="bodyMedium" style={styles.triggerRankText}>
+                      <Text variant='bodyMedium' style={styles.triggerRankText}>
                         {index + 1}
                       </Text>
                     </Surface>
-                    <Text variant="bodyLarge" style={styles.triggerName}>
+                    <Text variant='bodyLarge' style={styles.triggerName}>
                       {item.trigger}
                     </Text>
                   </Surface>
@@ -462,19 +462,16 @@ export default function StatsPage() {
                       style={styles.triggerProgressBarContainer}
                       elevation={0}
                     >
-                      <Surface
+                      <View
                         style={[
                           styles.triggerProgressBarFilled,
                           {
-                            width: `${
-                              (item.count / (topTriggers[0]?.count || 1)) * 100
-                            }%`,
+                            width: `${(item.count / (topTriggers[0]?.count || 1)) * 100}%`,
                           },
                         ]}
-                        elevation={0}
                       />
                     </Surface>
-                    <Text variant="titleMedium" style={styles.triggerCount}>
+                    <Text variant='titleMedium' style={styles.triggerCount}>
                       {item.count}
                     </Text>
                   </Surface>
@@ -485,9 +482,9 @@ export default function StatsPage() {
         )}
 
         {/* Daily Breakdown - Only for week view */}
-        {selectedPeriod === "week" && dailyBreakdown.length > 0 && (
+        {selectedPeriod === 'week' && dailyBreakdown.length > 0 && (
           <Surface style={styles.section} elevation={0}>
-            <Text variant="titleLarge" style={styles.sectionTitle}>
+            <Text variant='titleLarge' style={styles.sectionTitle}>
               Daily Breakdown
             </Text>
 
@@ -495,24 +492,23 @@ export default function StatsPage() {
               <Card key={index} style={styles.dayCard}>
                 <Card.Content style={styles.dayCardContent}>
                   <Surface style={styles.dayLeft} elevation={0}>
-                    <Text variant="bodyLarge" style={styles.dayName}>
+                    <Text variant='bodyLarge' style={styles.dayName}>
                       {item.day}
                     </Text>
-                    <Text variant="bodySmall" style={styles.dayDate}>
+                    <Text variant='bodySmall' style={styles.dayDate}>
                       {item.date}
                     </Text>
                   </Surface>
                   <Surface style={styles.dayRight} elevation={0}>
                     <Surface style={styles.progressBarContainer} elevation={0}>
-                      <Surface
+                      <View
                         style={[
                           styles.progressBarFilled,
                           { width: `${item.progress * 100}%` },
                         ]}
-                        elevation={0}
                       />
                     </Surface>
-                    <Text variant="titleMedium" style={styles.dayCount}>
+                    <Text variant='titleMedium' style={styles.dayCount}>
                       {item.count}
                     </Text>
                   </Surface>
@@ -526,7 +522,7 @@ export default function StatsPage() {
         <Card style={styles.goalCard}>
           <Card.Content>
             <Surface style={styles.goalHeader} elevation={0}>
-              <Text variant="titleLarge" style={styles.goalTitle}>
+              <Text variant='titleLarge' style={styles.goalTitle}>
                 Your Goals
               </Text>
               {previousTotal > 0 && (
@@ -538,7 +534,7 @@ export default function StatsPage() {
                   elevation={0}
                 >
                   <Text
-                    variant="titleMedium"
+                    variant='titleMedium'
                     style={[
                       styles.goalPercentage,
                       { color: theme.colors.primary },
@@ -552,34 +548,34 @@ export default function StatsPage() {
 
             {previousTotal > 0 ? (
               <>
-                <Text variant="bodyLarge" style={styles.goalDescription}>
-                  {Math.abs(percentageChange)}%{" "}
-                  {percentageChange < 0 ? "less" : "more"} than{" "}
+                <Text variant='bodyLarge' style={styles.goalDescription}>
+                  {Math.abs(percentageChange)}%{' '}
+                  {percentageChange < 0 ? 'less' : 'more'} than{' '}
                   {getComparisonLabel()}
                 </Text>
                 <Text
-                  variant="bodyMedium"
+                  variant='bodyMedium'
                   style={[
                     styles.goalStatus,
-                    { color: percentageChange <= 0 ? "#4CAF50" : "#F44336" },
+                    { color: percentageChange <= 0 ? '#4CAF50' : '#F44336' },
                   ]}
                 >
-                  {percentageChange <= 0 ? "On track" : "Need improvement"}
+                  {percentageChange <= 0 ? 'On track' : 'Need improvement'}
                 </Text>
               </>
             ) : (
-              <Text variant="bodyLarge" style={styles.goalDescription}>
+              <Text variant='bodyLarge' style={styles.goalDescription}>
                 {currentTotal > 0
                   ? `You've logged ${currentTotal} ${
-                      currentTotal === 1 ? "cigarette" : "cigarettes"
+                      currentTotal === 1 ? 'cigarette' : 'cigarettes'
                     } this ${
-                      selectedPeriod === "week"
-                        ? "week"
-                        : selectedPeriod === "month"
-                        ? "month"
-                        : "year"
+                      selectedPeriod === 'week'
+                        ? 'week'
+                        : selectedPeriod === 'month'
+                          ? 'month'
+                          : 'year'
                     }. Keep tracking to see your progress!`
-                  : "Start tracking to set your goals and monitor progress 📊"}
+                  : 'Start tracking to set your goals and monitor progress 📊'}
               </Text>
             )}
           </Card.Content>
@@ -595,17 +591,17 @@ export default function StatsPage() {
           <Card.Content>
             <Surface style={styles.insightHeader} elevation={0}>
               <Icon
-                source="lightbulb-outline"
+                source='lightbulb-outline'
                 size={20}
                 color={theme.colors.primary}
               />
-              <Text variant="titleMedium" style={styles.insightTitle}>
+              <Text variant='titleMedium' style={styles.insightTitle}>
                 Health Insight
               </Text>
             </Surface>
-            <Text variant="bodyMedium" style={styles.insightText}>
+            <Text variant='bodyMedium' style={styles.insightText}>
               {healthInsight ||
-                "Track your progress to get personalized insights 💡"}
+                'Track your progress to get personalized insights 💡'}
             </Text>
           </Card.Content>
         </Card>
@@ -620,14 +616,14 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   header: {
     marginBottom: 20,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   headerTitle: {
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 4,
   },
   headerSubtitle: {
@@ -635,14 +631,14 @@ const styles = StyleSheet.create({
   },
   periodSelector: {
     marginBottom: 20,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   chartContainer: {
     marginBottom: 24,
     marginHorizontal: -16,
     borderRadius: 0,
-    overflow: "hidden",
-    backgroundColor: "transparent",
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   chart: {
     marginLeft: -16,
@@ -650,10 +646,10 @@ const styles = StyleSheet.create({
     borderRadius: 0,
   },
   statsRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
     marginBottom: 24,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   statCardHalf: {
     flex: 1,
@@ -663,32 +659,32 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   statValueRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
+    flexDirection: 'row',
+    alignItems: 'baseline',
     marginBottom: 8,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   statNumber: {
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
   changeRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   changeTextGreen: {
-    color: "#4CAF50",
+    color: '#4CAF50',
   },
   changeTextRed: {
-    color: "#F44336",
+    color: '#F44336',
   },
   section: {
     marginBottom: 24,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   sectionTitle: {
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 4,
   },
   sectionSubtitle: {
@@ -699,147 +695,147 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   triggerCardContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 8,
   },
   triggerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     flex: 1,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   triggerRank: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#E3F2FD",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   triggerRankText: {
-    color: "#4285F4",
-    fontWeight: "600",
+    color: '#4285F4',
+    fontWeight: '600',
   },
   triggerName: {
-    fontWeight: "500",
-    textTransform: "capitalize",
+    fontWeight: '500',
+    textTransform: 'capitalize',
   },
   triggerRight: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     flex: 1.8,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   triggerProgressBarContainer: {
     flex: 1,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#E8E8E8",
-    overflow: "hidden",
+    backgroundColor: '#E8E8E8',
+    overflow: 'hidden',
   },
   triggerProgressBarFilled: {
-    height: "100%",
-    backgroundColor: "#4285F4",
+    height: '100%',
+    backgroundColor: '#4285F4',
     borderRadius: 6,
   },
   triggerCount: {
-    fontWeight: "600",
+    fontWeight: '600',
     minWidth: 30,
-    textAlign: "right",
-    color: "#4285F4",
+    textAlign: 'right',
+    color: '#4285F4',
   },
   dayCard: {
     marginBottom: 12,
   },
   dayCardContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 8,
   },
   dayLeft: {
     flex: 1,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   dayName: {
-    fontWeight: "500",
+    fontWeight: '500',
     marginBottom: 2,
   },
   dayDate: {
     opacity: 0.6,
   },
   dayRight: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     flex: 1.8,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   progressBarContainer: {
     flex: 1,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#E8E8E8",
-    overflow: "hidden",
+    backgroundColor: '#E8E8E8',
+    overflow: 'hidden',
   },
   progressBarFilled: {
-    height: "100%",
-    backgroundColor: "#4285F4",
+    height: '100%',
+    backgroundColor: '#4285F4',
     borderRadius: 6,
   },
   dayCount: {
-    fontWeight: "600",
+    fontWeight: '600',
     minWidth: 30,
-    textAlign: "right",
+    textAlign: 'right',
   },
   goalCard: {
     marginBottom: 24,
   },
   goalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   goalTitle: {
-    fontWeight: "600",
+    fontWeight: '600',
   },
   goalBadge: {
     width: 60,
     height: 60,
     borderRadius: 30,
     borderWidth: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   goalPercentage: {
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
   goalDescription: {
     marginBottom: 8,
     opacity: 0.7,
   },
   goalStatus: {
-    fontWeight: "500",
+    fontWeight: '500',
   },
   insightCard: {
     marginBottom: 16,
   },
   insightHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     marginBottom: 8,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
   },
   insightTitle: {
-    fontWeight: "600",
+    fontWeight: '600',
   },
   insightText: {
     lineHeight: 20,
