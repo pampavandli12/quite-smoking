@@ -12,7 +12,7 @@ import {
 } from '@/db';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import {
   Card,
@@ -462,16 +462,13 @@ export default function StatsPage() {
                       style={styles.triggerProgressBarContainer}
                       elevation={0}
                     >
-                      <Surface
+                      <View
                         style={[
                           styles.triggerProgressBarFilled,
                           {
-                            width: `${
-                              (item.count / (topTriggers[0]?.count || 1)) * 100
-                            }%`,
+                            width: `${(item.count / (topTriggers[0]?.count || 1)) * 100}%`,
                           },
                         ]}
-                        elevation={0}
                       />
                     </Surface>
                     <Text variant='titleMedium' style={styles.triggerCount}>
@@ -504,12 +501,11 @@ export default function StatsPage() {
                   </Surface>
                   <Surface style={styles.dayRight} elevation={0}>
                     <Surface style={styles.progressBarContainer} elevation={0}>
-                      <Surface
+                      <View
                         style={[
                           styles.progressBarFilled,
                           { width: `${item.progress * 100}%` },
                         ]}
-                        elevation={0}
                       />
                     </Surface>
                     <Text variant='titleMedium' style={styles.dayCount}>
