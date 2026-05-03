@@ -76,7 +76,7 @@ This app uses RevenueCat for managing in-app subscriptions. Follow these steps t
 
 1. Go to "Entitlements" tab
 2. Click "New Entitlement"
-3. Name it "premium"
+3. Name it "QuitSmoke Pro"
 4. This is what the app checks for subscription status
 
 ### Create Product
@@ -135,7 +135,7 @@ const REVENUECAT_API_KEY = Platform.select({
 
 ## Entitlement Identifiers
 
-The app checks for the entitlement named **"premium"**. Make sure this matches in RevenueCat dashboard.
+The app checks for the entitlement identifier **"QuitSmoke Pro"**. Make sure this matches the Identifier value in the RevenueCat dashboard.
 
 ## Product IDs
 

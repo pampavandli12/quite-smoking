@@ -1,4 +1,6 @@
-import PurchaseService from '@/services/purchases';
+import PurchaseService, {
+  REVENUECAT_ENTITLEMENT_ID,
+} from '@/services/purchases';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -23,8 +25,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PAYWALL_BYPASS =
   Constants.expoConfig?.extra?.PAYWALL_BYPASS === 'true';
-const ENTITLEMENT_ID = 'QuitSmoke Pro';
-
 export default function SubscriptionPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -49,7 +49,8 @@ export default function SubscriptionPage() {
       setChecking(false);
       if (
         customerInfo &&
-        typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined'
+        typeof customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !==
+          'undefined'
       ) {
         router.replace('/(tabs)/home');
       }
@@ -133,7 +134,9 @@ export default function SubscriptionPage() {
           );
         } else {
           const hasEntitlement =
-            typeof customerInfo.entitlements?.active?.['premium'] !==
+            typeof customerInfo.entitlements?.active?.[
+              REVENUECAT_ENTITLEMENT_ID
+            ] !==
             'undefined';
 
           if (hasEntitlement) {
