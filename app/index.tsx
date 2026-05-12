@@ -23,8 +23,7 @@ import {
 import type { PurchasesPackage } from 'react-native-purchases';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const PAYWALL_BYPASS =
-  Constants.expoConfig?.extra?.PAYWALL_BYPASS === 'true';
+const PAYWALL_BYPASS = Constants.expoConfig?.extra?.PAYWALL_BYPASS === 'true';
 export default function SubscriptionPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -136,8 +135,7 @@ export default function SubscriptionPage() {
           const hasEntitlement =
             typeof customerInfo.entitlements?.active?.[
               REVENUECAT_ENTITLEMENT_ID
-            ] !==
-            'undefined';
+            ] !== 'undefined';
 
           if (hasEntitlement) {
             Alert.alert('Success!', 'Your purchase has been restored! 🎉', [
@@ -193,24 +191,20 @@ export default function SubscriptionPage() {
       ]}
     >
       {/* Header Image */}
-      {/* <Surface style={styles.headerImageContainer} elevation={0}>
-        <Surface
-          style={[
-            styles.headerImagePlaceholder,
-            { backgroundColor: theme.colors.surfaceVariant },
-          ]}
-        >
-          <Icon source="account-group" size={60} color={theme.colors.primary} />
-        </Surface>
-      </Surface> */}
+      <Surface style={styles.headerImageContainer} elevation={0}>
+        <Icon source='cigar-off' size={60} color={theme.colors.primary} />
+        <Text variant='bodyLarge' style={styles.pillText}>
+          7 days completely free
+        </Text>
+      </Surface>
 
       {/* Title Section */}
       <Surface style={styles.titleSection} elevation={0}>
         <Text variant='headlineMedium' style={styles.title}>
-          Try Premium Free for 7 Days
+          Unlock your quit journey
         </Text>
         <Text variant='bodyLarge' style={styles.subtitle}>
-          Cancel anytime, no commitment
+          Try premium free — cancel anytime, no commitment.
         </Text>
       </Surface>
 
@@ -223,49 +217,53 @@ export default function SubscriptionPage() {
         </Text>
 
         <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='check-circle' size={24} color='#4CAF50' />
+          <Icon source='chart-bar' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
             <Text variant='bodyLarge' style={styles.featureTitle}>
-              Unlimited Access
+              Full smoking history
             </Text>
             <Text variant='bodyMedium' style={styles.featureDescription}>
-              Access all premium features and content
+              See all your past cigarette logs with daily, weekly, and monthly
+              breakdowns.
             </Text>
           </Surface>
         </Surface>
 
         <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='check-circle' size={24} color='#4CAF50' />
+          <Icon source='fire' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
             <Text variant='bodyLarge' style={styles.featureTitle}>
-              Ad-Free Experience
+              Trigger analysis
             </Text>
             <Text variant='bodyMedium' style={styles.featureDescription}>
-              Enjoy uninterrupted usage without ads
+              Discover what situations and emotions drive your cravings the
+              most.
             </Text>
           </Surface>
         </Surface>
 
         <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='check-circle' size={24} color='#4CAF50' />
+          <Icon source='clock-time-eleven-outline' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
             <Text variant='bodyLarge' style={styles.featureTitle}>
-              Priority Support
+              Peak smoking hours
             </Text>
             <Text variant='bodyMedium' style={styles.featureDescription}>
-              Get help from our dedicated support team
+              See exactly which hours of the day you smoke most — awareness is
+              the first step.
             </Text>
           </Surface>
         </Surface>
 
         <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='check-circle' size={24} color='#4CAF50' />
+          <Icon source='calendar-check' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
             <Text variant='bodyLarge' style={styles.featureTitle}>
-              Offline Downloads
+              Smoke-free streaks
             </Text>
             <Text variant='bodyMedium' style={styles.featureDescription}>
-              Download content for offline viewing
+              Track your streak, hit milestones, and feel the momentum of every
+              smoke-free day.
             </Text>
           </Surface>
         </Surface>
@@ -394,14 +392,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 24,
-    backgroundColor: 'transparent',
-  },
-  headerImagePlaceholder: {
-    width: '100%',
-    height: 180,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
   },
   titleSection: {
     alignItems: 'center',
@@ -523,5 +515,15 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 16,
+  },
+  pillText: {
+    marginTop: 12,
+    fontWeight: '600',
+    fontSize: 14,
+    backgroundColor: '#c8dfc9',
+    color: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
 });
