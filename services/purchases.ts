@@ -13,7 +13,7 @@ const isExpoGo = Constants.appOwnership === 'expo';
 // For Expo Go testing, use the Test Store API key from https://rev.cat/sdk-test-store
 const REVENUECAT_API_KEY = Platform.select({
   ios: 'appl_YOUR_IOS_API_KEY_HERE',
-  android: 'goog_FLoWBujNJyaCqMBVQnvncXUMorF', // NOTE: Production API key for Android (from RevenueCat dashboard)
+  android: 'goog_aNAUZJDjjxoGZnAUJRgFSCeWWql', // NOTE: Production API key for Android (from RevenueCat dashboard)
   //android: 'test_rGcJzBvPICvxCewJbeUyPjmGKeO', // NOTE: Test revenuecat API key for Android (from RevenueCat dashboard)
 });
 
