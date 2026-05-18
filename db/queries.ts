@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
-import { db } from "./client";
-import { smokingLog, smokingLogTriggers } from "./schema";
+import { eq } from 'drizzle-orm';
+import { db } from './client';
+import { smokingLog, smokingLogTriggers } from './schema';
 
 // Insert a smoking log entry
 export async function logSmokingEvent(triggers: string[] = []) {
@@ -21,7 +21,7 @@ export async function logSmokingEvent(triggers: string[] = []) {
 
     return { success: true, logId };
   } catch (error) {
-    console.error("Error logging smoking event:", error);
+    console.error('Error logging smoking event:', error);
     return { success: false, error };
   }
 }
@@ -32,7 +32,7 @@ export async function getAllSmokingLogs() {
     const logs = db.select().from(smokingLog).all();
     return logs;
   } catch (error) {
-    console.error("Error fetching smoking logs:", error);
+    console.error('Error fetching smoking logs:', error);
     return [];
   }
 }
@@ -70,7 +70,7 @@ export async function getSmokingLogsWithTriggers() {
 
     return groupedLogs;
   } catch (error) {
-    console.error("Error fetching smoking logs with triggers:", error);
+    console.error('Error fetching smoking logs with triggers:', error);
     return [];
   }
 }
@@ -91,7 +91,7 @@ export async function getSmokingCountByDateRange(
 
     return filtered.length;
   } catch (error) {
-    console.error("Error fetching smoking count:", error);
+    console.error('Error fetching smoking count:', error);
     return 0;
   }
 }
@@ -109,7 +109,7 @@ export async function deleteSmokingLog(logId: number) {
 
     return { success: true };
   } catch (error) {
-    console.error("Error deleting smoking log:", error);
+    console.error('Error deleting smoking log:', error);
     return { success: false, error };
   }
 }
@@ -147,7 +147,7 @@ export async function getWeekStats() {
     );
     return count;
   } catch (error) {
-    console.error("Error fetching week stats:", error);
+    console.error('Error fetching week stats:', error);
     return 0;
   }
 }
@@ -159,6 +159,9 @@ export async function getWeeklyBreakdown() {
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
 
     const logs = db.select().from(smokingLog).all();
 
@@ -167,7 +170,7 @@ export async function getWeeklyBreakdown() {
 
     logs.forEach((log) => {
       const logDate = new Date(log.timestamp);
-      if (logDate >= startOfWeek) {
+      if (logDate >= startOfWeek && logDate <= endOfWeek) {
         const dayIndex = logDate.getDay();
         dayCounts[dayIndex]++;
       }
@@ -175,7 +178,7 @@ export async function getWeeklyBreakdown() {
 
     return dayCounts;
   } catch (error) {
-    console.error("Error fetching weekly breakdown:", error);
+    console.error('Error fetching weekly breakdown:', error);
     return [0, 0, 0, 0, 0, 0, 0];
   }
 }
@@ -237,7 +240,7 @@ export async function getPreviousWeekStats() {
     );
     return count;
   } catch (error) {
-    console.error("Error fetching previous week stats:", error);
+    console.error('Error fetching previous week stats:', error);
     return 0;
   }
 }
@@ -254,13 +257,13 @@ export async function getDetailedWeeklyBreakdown() {
 
     const breakdown = [];
     const dayNames = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
     ];
 
     for (let i = 0; i < 7; i++) {
@@ -280,9 +283,9 @@ export async function getDetailedWeeklyBreakdown() {
 
       breakdown.push({
         day: dayNames[currentDay.getDay()],
-        date: currentDay.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
+        date: currentDay.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
         }),
         count: dayLogs.length,
         progress: dayLogs.length / 20, // Assume max 20 per day
@@ -291,62 +294,65 @@ export async function getDetailedWeeklyBreakdown() {
 
     return breakdown;
   } catch (error) {
-    console.error("Error fetching detailed weekly breakdown:", error);
+    console.error('Error fetching detailed weekly breakdown:', error);
     return [];
   }
 }
 
-// Get monthly breakdown (30 days)
+// Get monthly breakdown for the current calendar month, grouped into 4 weeks.
 export async function getMonthlyBreakdown() {
   try {
     const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
     const logs = db.select().from(smokingLog).all();
 
-    const dayCounts = new Array(30).fill(0);
+    const weekCounts = new Array(4).fill(0);
 
     logs.forEach((log) => {
       const logDate = new Date(log.timestamp);
-      const daysDiff = Math.floor(
-        (today.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      if (daysDiff >= 0 && daysDiff < 30) {
-        dayCounts[29 - daysDiff]++;
+      if (logDate >= startOfMonth && logDate <= endOfMonth) {
+        const weekIndex = Math.min(Math.floor((logDate.getDate() - 1) / 7), 3);
+        weekCounts[weekIndex]++;
       }
     });
 
-    return dayCounts;
+    return weekCounts;
   } catch (error) {
-    console.error("Error fetching monthly breakdown:", error);
-    return new Array(30).fill(0);
+    console.error('Error fetching monthly breakdown:', error);
+    return new Array(4).fill(0);
   }
 }
 
-// Get yearly breakdown (12 months)
+// Get yearly breakdown for the current calendar year.
 export async function getYearlyBreakdown() {
   try {
     const today = new Date();
+    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
     const logs = db.select().from(smokingLog).all();
 
     const monthCounts = new Array(12).fill(0);
 
     logs.forEach((log) => {
       const logDate = new Date(log.timestamp);
-      const yearDiff = today.getFullYear() - logDate.getFullYear();
-      const monthDiff = today.getMonth() - logDate.getMonth();
-      const totalMonthsDiff = yearDiff * 12 + monthDiff;
-
-      if (totalMonthsDiff >= 0 && totalMonthsDiff < 12) {
-        monthCounts[11 - totalMonthsDiff]++;
+      if (logDate >= startOfYear && logDate <= endOfYear) {
+        monthCounts[logDate.getMonth()]++;
       }
     });
 
     return monthCounts;
   } catch (error) {
-    console.error("Error fetching yearly breakdown:", error);
+    console.error('Error fetching yearly breakdown:', error);
     return new Array(12).fill(0);
   }
 }
@@ -386,7 +392,7 @@ export async function getTopTrigger() {
 
     return topTrigger;
   } catch (error) {
-    console.error("Error fetching top trigger:", error);
+    console.error('Error fetching top trigger:', error);
     return null;
   }
 }
@@ -422,49 +428,7 @@ export async function getTop5Triggers() {
 
     return sortedTriggers;
   } catch (error) {
-    console.error("Error fetching top 5 triggers:", error);
+    console.error('Error fetching top 5 triggers:', error);
     return [];
-  }
-}
-
-// Get last 3 days breakdown
-export async function getLast3DaysBreakdown() {
-  try {
-    const today = new Date();
-    const logs = db.select().from(smokingLog).all();
-
-    // Initialize counts for last 3 days (day before yesterday, yesterday, today)
-    const dayCounts = [0, 0, 0];
-
-    logs.forEach((log) => {
-      const logDate = new Date(log.timestamp);
-      const todayStart = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-      );
-      const logStart = new Date(
-        logDate.getFullYear(),
-        logDate.getMonth(),
-        logDate.getDate(),
-      );
-
-      // Calculate days difference
-      const diffTime = todayStart.getTime() - logStart.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 0) {
-        dayCounts[2]++; // Today
-      } else if (diffDays === 1) {
-        dayCounts[1]++; // Yesterday
-      } else if (diffDays === 2) {
-        dayCounts[0]++; // Day before yesterday
-      }
-    });
-
-    return dayCounts;
-  } catch (error) {
-    console.error("Error fetching last 3 days breakdown:", error);
-    return [0, 0, 0];
   }
 }
