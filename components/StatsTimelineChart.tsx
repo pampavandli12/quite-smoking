@@ -8,16 +8,14 @@ import {
 } from '@/db';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import {
-  Card,
-  Icon,
-  SegmentedButtons,
-  Surface,
-  Text,
-  useTheme,
-} from 'react-native-paper';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { Card, Icon, Surface, Text, useTheme } from 'react-native-paper';
 
 export type StatsPeriod = 'week' | 'month' | 'year';
 
@@ -59,7 +57,15 @@ function getRangeTotal(start: Date, end: Date) {
 async function getPreviousMonthStats() {
   const today = new Date();
   const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const end = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+  const end = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    0,
+    23,
+    59,
+    59,
+    999,
+  );
 
   return getRangeTotal(start, end);
 }
@@ -172,6 +178,101 @@ function getChartLabels(period: StatsPeriod) {
   return YEAR_LABELS;
 }
 
+type PeriodSelectorProps = {
+  period: StatsPeriod;
+  onPeriodChange: (period: StatsPeriod) => void;
+};
+
+const PERIODS: StatsPeriod[] = ['week', 'month', 'year'];
+const PERIOD_LABELS: Record<StatsPeriod, string> = {
+  week: 'Week',
+  month: 'Month',
+  year: 'Year',
+};
+
+function AnimatedPeriodSelector({
+  period,
+  onPeriodChange,
+}: PeriodSelectorProps) {
+  const theme = useTheme();
+  const [layout, setLayout] = useState<{ width: number; x: number } | null>(
+    null,
+  );
+  const selectedIndex = PERIODS.indexOf(period);
+  const animatedPosition = useSharedValue(0);
+
+  useEffect(() => {
+    if (layout) {
+      animatedPosition.value = withSpring(selectedIndex * (layout.width / 3), {
+        damping: 35,
+        mass: 1,
+        overshootClamping: false,
+      });
+    }
+  }, [selectedIndex, layout, animatedPosition]);
+
+  const animatedBackgroundStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: animatedPosition.value }],
+  }));
+
+  return (
+    <Surface
+      style={[
+        styles.periodSelectorContainer,
+        {
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+      ]}
+      elevation={0}
+    >
+      <View
+        onLayout={(event) => {
+          const { width } = event.nativeEvent.layout;
+          setLayout({ width, x: 0 });
+        }}
+        style={styles.periodSelectorWrapper}
+      >
+        {layout && (
+          <Animated.View
+            style={[
+              styles.periodSelectorBackground,
+              {
+                width: layout.width / 3,
+                backgroundColor: theme.colors.primary,
+              },
+              animatedBackgroundStyle,
+            ]}
+          />
+        )}
+
+        {PERIODS.map((p) => (
+          <Pressable
+            key={p}
+            onPress={() => onPeriodChange(p)}
+            style={styles.periodButton}
+          >
+            <Text
+              variant='labelLarge'
+              style={[
+                styles.periodButtonText,
+                {
+                  color:
+                    p === period
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceVariant,
+                  fontWeight: p === period ? '700' : '500',
+                },
+              ]}
+            >
+              {PERIOD_LABELS[p]}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </Surface>
+  );
+}
+
 export default function StatsTimelineChart({
   onSummaryChange,
 }: StatsTimelineChartProps) {
@@ -275,17 +376,7 @@ export default function StatsTimelineChart({
 
   return (
     <>
-      <Surface style={styles.periodSelector} elevation={0}>
-        <SegmentedButtons
-          value={period}
-          onValueChange={(value) => setPeriod(value as StatsPeriod)}
-          buttons={[
-            { value: 'week', label: 'Week' },
-            { value: 'month', label: 'Month' },
-            { value: 'year', label: 'Year' },
-          ]}
-        />
-      </Surface>
+      <AnimatedPeriodSelector period={period} onPeriodChange={setPeriod} />
 
       <Surface style={styles.chartContainer} elevation={0}>
         <LineChart
@@ -327,7 +418,9 @@ export default function StatsTimelineChart({
             {previousTotal > 0 && (
               <Surface style={styles.changeRow} elevation={0}>
                 <Icon
-                  source={percentageChange < 0 ? 'trending-down' : 'trending-up'}
+                  source={
+                    percentageChange < 0 ? 'trending-down' : 'trending-up'
+                  }
                   size={16}
                   color={percentageChange < 0 ? '#4CAF50' : '#F44336'}
                 />
@@ -364,7 +457,9 @@ export default function StatsTimelineChart({
             {previousTotal > 0 && (
               <Surface style={styles.changeRow} elevation={0}>
                 <Icon
-                  source={percentageChange < 0 ? 'trending-down' : 'trending-up'}
+                  source={
+                    percentageChange < 0 ? 'trending-down' : 'trending-up'
+                  }
                   size={16}
                   color={percentageChange < 0 ? '#4CAF50' : '#F44336'}
                 />
@@ -389,9 +484,32 @@ export default function StatsTimelineChart({
 }
 
 const styles = StyleSheet.create({
-  periodSelector: {
+  periodSelectorContainer: {
     marginBottom: 20,
-    backgroundColor: 'transparent',
+    borderRadius: 20,
+    padding: 4,
+    overflow: 'hidden',
+  },
+  periodSelectorWrapper: {
+    flexDirection: 'row',
+    height: 40,
+    position: 'relative',
+  },
+  periodSelectorBackground: {
+    position: 'absolute',
+    height: 40,
+    borderRadius: 16,
+    top: 0,
+    left: 0,
+  },
+  periodButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  periodButtonText: {
+    textAlign: 'center',
   },
   chartContainer: {
     marginBottom: 24,
