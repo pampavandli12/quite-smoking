@@ -4,6 +4,7 @@ import PurchaseService, {
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { getSmokingSettings } from '@/db/queries';
 import {
   ActivityIndicator,
   Alert,
@@ -33,12 +34,26 @@ export default function SubscriptionPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (PAYWALL_BYPASS) {
-      router.replace('/(tabs)/home');
-      return;
-    }
-    checkSubscription();
-    loadOfferings();
+    (async () => {
+      if (PAYWALL_BYPASS) {
+        router.replace('/(tabs)/home');
+        return;
+      }
+
+      // Ensure user has provided cigarettes/day and cost before showing paywall
+      try {
+        const settings = await getSmokingSettings();
+        if (!settings) {
+          router.replace('/setup-smoking');
+          return;
+        }
+      } catch (err) {
+        console.error('Error checking smoking settings:', err);
+      }
+
+      checkSubscription();
+      loadOfferings();
+    })();
   }, []);
 
   const checkSubscription = async () => {

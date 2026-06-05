@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from './client';
-import { smokingLog, smokingLogTriggers } from './schema';
+import { smokingLog, smokingLogTriggers, userSmokingSettings } from './schema';
 
 // Insert a smoking log entry
 export async function logSmokingEvent(triggers: string[] = []) {
@@ -354,6 +354,45 @@ export async function getYearlyBreakdown() {
   } catch (error) {
     console.error('Error fetching yearly breakdown:', error);
     return new Array(12).fill(0);
+  }
+}
+
+// --- User smoking settings (cigarettes per day & cost) ---
+export async function getSmokingSettings() {
+  try {
+    const rows = db.select().from(userSmokingSettings).all();
+    if (!rows || rows.length === 0) return null;
+
+    // Return the most recent settings (by createdAt)
+    const sorted = rows.sort((a: any, b: any) => b.createdAt - a.createdAt);
+    const s = sorted[0];
+    return {
+      id: s.id,
+      cigarettesPerDay: s.cigarettesPerDay,
+      costPerCigaretteCents: s.costPerCigaretteCents,
+      createdAt: s.createdAt,
+    };
+  } catch (error) {
+    console.error('Error fetching smoking settings:', error);
+    return null;
+  }
+}
+
+export async function setSmokingSettings(
+  cigarettesPerDay: number,
+  costPerCigarette: number,
+) {
+  try {
+    const cents = Math.round(costPerCigarette * 100);
+    const result = await db
+      .insert(userSmokingSettings)
+      .values({ cigarettesPerDay, costPerCigaretteCents: cents })
+      .returning();
+
+    return { success: true, result };
+  } catch (error) {
+    console.error('Error saving smoking settings:', error);
+    return { success: false, error };
   }
 }
 
