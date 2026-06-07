@@ -124,7 +124,6 @@ export default function SubscriptionPage() {
         );
       }
     } catch (error) {
-      console.error('Purchase error:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -212,10 +211,6 @@ export default function SubscriptionPage() {
         <Text variant='bodyLarge' style={styles.pillText}>
           7 days completely free
         </Text>
-      </Surface>
-
-      {/* Title Section */}
-      <Surface style={styles.titleSection} elevation={0}>
         <Text variant='headlineMedium' style={styles.title}>
           Unlock your quit journey
         </Text>
@@ -232,6 +227,7 @@ export default function SubscriptionPage() {
           What You&apos;ll Get
         </Text>
 
+        {/* Smoking history */}
         <Surface style={styles.featureItem} elevation={0}>
           <Icon source='chart-bar' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
@@ -244,7 +240,34 @@ export default function SubscriptionPage() {
             </Text>
           </Surface>
         </Surface>
+        {/* Money saved */}
+        <Surface style={styles.featureItem} elevation={0}>
+          <Icon source='currency-inr' size={24} color='#4CAF50' />
+          <Surface style={styles.featureTextContainer} elevation={0}>
+            <Text variant='bodyLarge' style={styles.featureTitle}>
+              Money saved
+            </Text>
+            <Text variant='bodyMedium' style={styles.featureDescription}>
+              Watch your savings grow as you stay smoke-free. It&apos;s not just
+              good for your health, but also your wallet!
+            </Text>
+          </Surface>
+        </Surface>
+        {/* Smoke-free streaks */}
+        <Surface style={styles.featureItem} elevation={0}>
+          <Icon source='calendar-check' size={24} color='#4CAF50' />
+          <Surface style={styles.featureTextContainer} elevation={0}>
+            <Text variant='bodyLarge' style={styles.featureTitle}>
+              Smoke-free streaks
+            </Text>
+            <Text variant='bodyMedium' style={styles.featureDescription}>
+              Track your streak, hit milestones, and feel the momentum of every
+              smoke-free day.
+            </Text>
+          </Surface>
+        </Surface>
 
+        {/* Trigger analysis */}
         <Surface style={styles.featureItem} elevation={0}>
           <Icon source='fire' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
@@ -257,7 +280,7 @@ export default function SubscriptionPage() {
             </Text>
           </Surface>
         </Surface>
-
+        {/* Peak smoking hours */}
         <Surface style={styles.featureItem} elevation={0}>
           <Icon source='clock-time-eleven-outline' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
@@ -267,19 +290,6 @@ export default function SubscriptionPage() {
             <Text variant='bodyMedium' style={styles.featureDescription}>
               See exactly which hours of the day you smoke most — awareness is
               the first step.
-            </Text>
-          </Surface>
-        </Surface>
-
-        <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='calendar-check' size={24} color='#4CAF50' />
-          <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant='bodyLarge' style={styles.featureTitle}>
-              Smoke-free streaks
-            </Text>
-            <Text variant='bodyMedium' style={styles.featureDescription}>
-              Track your streak, hit milestones, and feel the momentum of every
-              smoke-free day.
             </Text>
           </Surface>
         </Surface>
@@ -403,6 +413,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
+    marginTop: 12,
   },
   subtitle: {
     textAlign: 'center',

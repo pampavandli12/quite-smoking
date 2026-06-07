@@ -30,6 +30,19 @@ export async function logSmokingEvent(triggers: string[] = []) {
 export async function getAllSmokingLogs() {
   try {
     const logs = db.select().from(smokingLog).all();
+
+    // Filter out logs with invalid or ancient timestamps (bad data)
+    const validLogs = (logs || []).filter((log) => {
+      const d = new Date(log.timestamp);
+      if (isNaN(d.getTime())) return false;
+      // ignore anything before year 2000 as invalid/ancient
+      return d.getFullYear() >= 2000;
+    });
+
+    // If there are no valid logs yet, user hasn't started tracking
+    if (!validLogs || validLogs.length === 0) {
+      return 0;
+    }
     return logs;
   } catch (error) {
     console.error('Error fetching smoking logs:', error);
@@ -479,12 +492,25 @@ export async function getNonSmokingStreak() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Filter out logs with invalid or ancient timestamps (bad data)
+    const validLogs = (logs || []).filter((log) => {
+      const d = new Date(log.timestamp);
+      if (isNaN(d.getTime())) return false;
+      // ignore anything before year 2000 as invalid/ancient
+      return d.getFullYear() >= 2000;
+    });
+
+    // If there are no valid logs yet, user hasn't started tracking
+    if (!validLogs || validLogs.length === 0) {
+      return 0;
+    }
+
     // Check if user smoked today
     const todayStart = new Date(today);
     const todayEnd = new Date(today);
     todayEnd.setHours(23, 59, 59, 999);
 
-    const smokedToday = logs.some((log) => {
+    const smokedToday = validLogs.some((log) => {
       const logDate = new Date(log.timestamp);
       return logDate >= todayStart && logDate <= todayEnd;
     });
@@ -499,14 +525,23 @@ export async function getNonSmokingStreak() {
     let checkDate = new Date(today);
     checkDate.setDate(checkDate.getDate() - 1); // Start from yesterday
 
+    // Determine earliest valid log date so we don't count before tracking began
+    const earliestLogDate = new Date(
+      Math.min(...validLogs.map((l) => new Date(l.timestamp).getTime())),
+    );
+    earliestLogDate.setHours(0, 0, 0, 0);
+
     while (true) {
+      // If we've gone before the earliest log, stop counting — user hadn't started
+      if (checkDate < earliestLogDate) break;
+
       const dayStart = new Date(checkDate);
       dayStart.setHours(0, 0, 0, 0);
 
       const dayEnd = new Date(checkDate);
       dayEnd.setHours(23, 59, 59, 999);
 
-      const smokedOnDay = logs.some((log) => {
+      const smokedOnDay = validLogs.some((log) => {
         const logDate = new Date(log.timestamp);
         return logDate >= dayStart && logDate <= dayEnd;
       });
@@ -518,10 +553,8 @@ export async function getNonSmokingStreak() {
       streak++;
       checkDate.setDate(checkDate.getDate() - 1);
 
-      // Prevent infinite loop - cap at a reasonable number
-      if (streak > 10000) {
-        break;
-      }
+      // Safety cap
+      if (streak > 10000) break;
     }
 
     return streak;

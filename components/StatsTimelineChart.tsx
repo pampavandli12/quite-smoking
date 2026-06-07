@@ -433,90 +433,94 @@ export default function StatsTimelineChart({
       <AnimatedPeriodSelector period={period} onPeriodChange={setPeriod} />
 
       {/* Money Saved Card */}
-      {smokingSettings && (
-        <Card
-          style={[
-            styles.moneySavedCard,
-            {
-              backgroundColor:
-                moneySaved >= 0
-                  ? theme.dark
-                    ? 'rgba(76, 175, 80, 0.15)'
-                    : '#E8F5E9'
-                  : theme.dark
-                    ? 'rgba(244, 67, 54, 0.15)'
-                    : '#FFEBEE',
-              marginBottom: 24,
-            },
-          ]}
-        >
-          <Card.Content>
-            <View style={styles.moneySavedContent}>
-              <Surface
-                style={[
-                  styles.moneySavedIconContainer,
-                  {
-                    backgroundColor:
-                      moneySaved >= 0 ? theme.colors.primary : '#F44336',
-                  },
-                ]}
-                elevation={0}
-              >
-                <Text style={styles.moneySavedIcon}>
-                  <Icon
-                    source='cash'
-                    size={40}
-                    color={
-                      theme.dark ? theme.colors.onPrimary : theme.colors.surface
-                    }
-                  />
-                </Text>
-              </Surface>
-
-              <View style={styles.moneySavedTextContainer}>
-                <Text
-                  variant='bodyMedium'
+      {smokingSettings &&
+        (currentTotal > 0 || chartData.some((v) => v > 0)) && (
+          <Card
+            style={[
+              styles.moneySavedCard,
+              {
+                backgroundColor:
+                  moneySaved >= 0
+                    ? theme.dark
+                      ? 'rgba(76, 175, 80, 0.15)'
+                      : '#E8F5E9'
+                    : theme.dark
+                      ? 'rgba(244, 67, 54, 0.15)'
+                      : '#FFEBEE',
+                marginBottom: 24,
+              },
+            ]}
+          >
+            <Card.Content>
+              <View style={styles.moneySavedContent}>
+                <Surface
                   style={[
-                    styles.moneySavedLabel,
-                    { color: theme.colors.onSurface, opacity: 0.8 },
-                  ]}
-                >
-                  {moneySaved >= 0 ? 'Money Saved' : 'Money Spent'}{' '}
-                  {period === 'week'
-                    ? 'This Week'
-                    : period === 'month'
-                      ? 'This Month'
-                      : 'This Year'}
-                </Text>
-                <Text
-                  variant='displaySmall'
-                  style={[
-                    styles.moneySavedAmount,
+                    styles.moneySavedIconContainer,
                     {
-                      color: moneySaved >= 0 ? theme.colors.primary : '#F44336',
+                      backgroundColor:
+                        moneySaved >= 0 ? theme.colors.primary : '#F44336',
                     },
                   ]}
+                  elevation={0}
                 >
-                  {moneySaved >= 0 ? '$' : '-$'}
-                  {Math.abs(moneySaved)}
-                </Text>
-                <Text
-                  variant='bodySmall'
-                  style={[
-                    styles.moneySavedFormula,
-                    { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
-                  ]}
-                >
-                  ${costPerCigaretteDisplay}/cigarette ×{' '}
-                  {moneySaved >= 0 ? '' : '+'}
-                  {Math.abs(cigarettesSaved)}{' '}
-                  {moneySaved >= 0 ? 'avoided' : 'extra'}
-                </Text>
+                  <Text style={styles.moneySavedIcon}>
+                    <Icon
+                      source='cash'
+                      size={40}
+                      color={
+                        theme.dark
+                          ? theme.colors.onPrimary
+                          : theme.colors.surface
+                      }
+                    />
+                  </Text>
+                </Surface>
+
+                <View style={styles.moneySavedTextContainer}>
+                  <Text
+                    variant='bodyMedium'
+                    style={[
+                      styles.moneySavedLabel,
+                      { color: theme.colors.onSurface, opacity: 0.8 },
+                    ]}
+                  >
+                    {moneySaved >= 0 ? 'Money Saved' : 'Money Spent'}{' '}
+                    {period === 'week'
+                      ? 'This Week'
+                      : period === 'month'
+                        ? 'This Month'
+                        : 'This Year'}
+                  </Text>
+                  <Text
+                    variant='displaySmall'
+                    style={[
+                      styles.moneySavedAmount,
+                      {
+                        color:
+                          moneySaved >= 0 ? theme.colors.primary : '#F44336',
+                      },
+                    ]}
+                  >
+                    {moneySaved >= 0 ? '$' : '-$'}
+                    {Math.abs(moneySaved)}
+                  </Text>
+                  <Text
+                    variant='bodySmall'
+                    style={[
+                      styles.moneySavedFormula,
+                      { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
+                    ]}
+                  >
+                    ${costPerCigaretteDisplay}/cigarette ×{' '}
+                    {moneySaved >= 0 ? '' : '+'}
+                    {Math.abs(cigarettesSaved)}{' '}
+                    {moneySaved >= 0 ? 'avoided' : 'extra'}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </Card.Content>
-        </Card>
-      )}
+            </Card.Content>
+          </Card>
+        )}
 
       <Surface style={styles.chartContainer} elevation={0}>
         <LineChart
