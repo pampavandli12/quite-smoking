@@ -77,6 +77,20 @@ export default function TabLayout() {
           tabBarIcon: StatsIcon,
         }}
       />
+      <Tabs.Screen
+        name='settings'
+        options={{
+          title: 'Settings',
+          headerShown: false,
+          tabBarIcon: ({ color, size, focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? 'cog' : 'cog-outline'}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

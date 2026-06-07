@@ -23,6 +23,7 @@ import {
 } from 'react-native-paper';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { URL_LINKS } from '@/utils/constants';
 
 const PAYWALL_BYPASS = Constants.expoConfig?.extra?.PAYWALL_BYPASS === 'true';
 export default function SubscriptionPage() {
@@ -192,7 +193,7 @@ export default function SubscriptionPage() {
     );
   }
   const redirectToPrivacyPolicy = () => {
-    const url = 'https://pampavandli12.github.io/quit-smoking-privacy/';
+    const url = URL_LINKS.privacy;
     Linking.openURL(url).catch((err) =>
       console.error('Failed to open URL:', err),
     );
@@ -326,12 +327,6 @@ export default function SubscriptionPage() {
 
       {/* Payment Methods */}
       <Surface style={styles.paymentSection} elevation={0}>
-        {/* <Surface style={styles.paymentIcons} elevation={0}>
-          <Icon source="credit-card" size={24} color={theme.colors.onSurface} />
-          <Icon source="apple" size={24} color={theme.colors.onSurface} />
-          <Icon source="google" size={24} color={theme.colors.onSurface} />
-          <Icon source="cash" size={24} color={theme.colors.onSurface} />
-        </Surface> */}
         <Surface style={styles.secureRow} elevation={0}>
           <Icon source='lock' size={16} color={theme.colors.onSurfaceVariant} />
           <Text variant='bodySmall' style={styles.secureText}>
@@ -362,17 +357,6 @@ export default function SubscriptionPage() {
       >
         Restore Purchase
       </Button>
-
-      {/* Skip Button (for testing) */}
-      {/* <Button
-        mode="text"
-        style={styles.skipButton}
-        textColor={theme.colors.onSurfaceVariant}
-        onPress={handleSkip}
-        disabled={loading}
-      >
-        Skip for now
-      </Button> */}
 
       {/* privacy policy */}
       <Button
