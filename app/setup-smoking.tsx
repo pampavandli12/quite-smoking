@@ -1,11 +1,21 @@
 import { useState } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
-import { TextInput, Button, Text, useTheme } from 'react-native-paper';
+import { StyleSheet, View, Alert, ScrollView } from 'react-native';
+import {
+  TextInput,
+  Button,
+  Text,
+  useTheme,
+  Icon,
+  Surface,
+  IconButton,
+} from 'react-native-paper';
 import { router } from 'expo-router';
 import { setSmokingSettings } from '@/db/queries';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SmokingSetupScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [cigarettesPerDay, setCigarettesPerDay] = useState('');
   const [costPerCigarette, setCostPerCigarette] = useState('');
   const [saving, setSaving] = useState(false);
@@ -13,7 +23,7 @@ export default function SmokingSetupScreen() {
   const valid = () => {
     const cpd = parseInt(cigarettesPerDay, 10);
     const cost = parseFloat(costPerCigarette);
-    return !isNaN(cpd) && cpd > 0 && !isNaN(cost) && cost >= 0;
+    return !isNaN(cpd) && cpd > 0 && !isNaN(cost) && cost > 0;
   };
 
   const handleSave = async () => {
@@ -40,64 +50,209 @@ export default function SmokingSetupScreen() {
       setSaving(false);
     }
   };
-
+  const searchAccessory = (accessoryProps) => (
+    <TextInput.Icon {...accessoryProps} icon='currency-inr' />
+  );
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text variant="headlineSmall" style={styles.title}>
-        A couple quick questions
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={{
+        paddingTop: insets.top + 24,
+        paddingBottom: insets.bottom + 40,
+        paddingHorizontal: 20,
+      }}
+      scrollEnabled={true}
+    >
+      {/* Main Heading */}
+      <Text variant='headlineMedium' style={{ marginTop: 16 }}>
+        Let's set your baseline
       </Text>
-      <Text variant="bodyMedium" style={styles.subtitle}>
-        Help us calculate your savings and streaks. These fields are required.
+
+      {/* Description */}
+      <Text
+        variant='bodyMedium'
+        style={{
+          marginBottom: 24,
+          marginTop: 8,
+          color: theme.colors.tertiary,
+        }}
+      >
+        This data helps us calculate your daily streaks and the money you save
+        by staying smoke-free.
       </Text>
 
-      <TextInput
-        label="Cigarettes per day"
-        value={cigarettesPerDay}
-        onChangeText={(t) => setCigarettesPerDay(t.replace(/[^0-9]/g, ''))}
-        keyboardType="numeric"
-        style={styles.input}
-      />
+      {/* cigarettes per day */}
+      <Surface
+        style={[
+          styles.configCard,
+          { borderColor: theme.colors.outlineVariant },
+        ]}
+        elevation={0}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'flex-start',
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          <Icon source='calendar' size={24} />
+          <Text
+            variant='titleMedium'
+            style={[styles.configTitle, { color: theme.colors.onSurface }]}
+          >
+            Cigarettes per day
+          </Text>
+        </View>
 
-      <TextInput
-        label="Cost per cigarette (e.g. 0.5)"
-        value={costPerCigarette}
-        onChangeText={(t) => setCostPerCigarette(t.replace(/[^0-9\.]/g, ''))}
-        keyboardType="decimal-pad"
-        style={styles.input}
-      />
+        {/* Cigarettes per day input */}
+        <View style={styles.inputWrapper}>
+          <IconButton
+            icon='minus'
+            style={[
+              styles.inputButton,
+              { borderColor: theme.colors.outlineVariant },
+            ]}
+            size={20}
+            onPress={() =>
+              setCigarettesPerDay((prev) => {
+                const num = parseInt(prev || '0', 10) - 1;
+                return num > 0 ? num.toString() : '';
+              })
+            }
+          />
+          <TextInput
+            value={cigarettesPerDay}
+            onChangeText={(t) => setCigarettesPerDay(t.replace(/[^0-9]/g, ''))}
+            keyboardType='numeric'
+            mode='outlined'
+            outlineColor='transparent'
+            activeOutlineColor='transparent'
+            style={[
+              styles.input,
+              { fontSize: 24, backgroundColor: theme.colors.surfaceVariant },
+            ]}
+          />
+          <IconButton
+            icon='plus'
+            size={20}
+            style={[
+              styles.inputButton,
+              { borderColor: theme.colors.outlineVariant },
+            ]}
+            onPress={() =>
+              setCigarettesPerDay((prev) => {
+                const num = parseInt(prev || '0', 10) + 1;
+                return num.toString();
+              })
+            }
+          />
+        </View>
+      </Surface>
+      {/* cost per cigarette */}
+      <Surface
+        style={[
+          styles.configCard,
+          { borderColor: theme.colors.outlineVariant },
+        ]}
+        elevation={0}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'flex-start',
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          <Icon source='cash' size={24} />
+          <Text
+            variant='titleMedium'
+            style={[styles.configTitle, { color: theme.colors.onSurface }]}
+          >
+            Cost per cigarette
+          </Text>
+        </View>
 
+        {/* Cigarettes per day input */}
+        <View style={styles.inputWrapper}>
+          <TextInput
+            value={costPerCigarette}
+            onChangeText={(t) =>
+              setCostPerCigarette(t.replace(/[^0-9\.]/g, ''))
+            }
+            left={searchAccessory({ size: 24, color: theme.colors.tertiary })}
+            keyboardType='decimal-pad'
+            mode='outlined'
+            outlineColor='transparent'
+            activeOutlineColor='transparent'
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.surfaceVariant,
+                fontSize: 24,
+                flex: 1,
+              },
+            ]}
+          />
+        </View>
+      </Surface>
+      {/* Start Tracking Button */}
       <Button
-        mode="contained"
+        mode='contained'
         onPress={handleSave}
         disabled={!valid() || saving}
         loading={saving}
-        style={styles.button}
+        style={styles.startButton}
+        contentStyle={styles.startButtonContent}
       >
-        Save and continue
+        Continue
       </Button>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'flex-start',
   },
-  title: {
-    marginBottom: 8,
+  configCard: {
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+  },
+  configTitle: {
     fontWeight: '600',
+    marginBottom: 8,
   },
-  subtitle: {
+  inputWrapper: {
     marginBottom: 20,
-    opacity: 0.8,
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  inputButton: {
+    opacity: 0.5,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    width: 50,
+    height: 50,
+    borderRadius: 49,
   },
   input: {
-    marginBottom: 12,
+    fontSize: 24,
+    fontWeight: '900',
   },
-  button: {
-    marginTop: 8,
-    borderRadius: 8,
+  startButton: {
+    marginTop: 35,
+    borderRadius: 10,
+  },
+  startButtonContent: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
   },
 });

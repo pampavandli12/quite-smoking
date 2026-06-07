@@ -7,7 +7,7 @@ import {
 } from '@/db';
 import TriggerBottomSheet from '@/components/TriggerBottomSheet';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
   Card,
@@ -17,6 +17,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Background } from '@react-navigation/elements';
 
 export default function HomePage() {
   const theme = useTheme();
@@ -107,6 +108,31 @@ export default function HomePage() {
             </Surface>
           </Card.Content>
         </Card>
+
+        {/* Streak card */}
+        <Card style={styles.streakCard}>
+          <Card.Content>
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+            >
+              <Icon source='fire' size={40} color={theme.colors.primary} />
+              <View>
+                <Text variant='titleMedium' style={styles.streakLabel}>
+                  Current Streak
+                </Text>
+                <Text variant='displaySmall' style={styles.streakCount}>
+                  {weeklyData.filter((v) => v > 0).length}
+                </Text>
+                <Text variant='bodySmall' style={{ opacity: 0.7 }}>
+                  {weeklyData.filter((v) => v > 0).length} day
+                  {weeklyData.filter((v) => v > 0).length !== 1 && 's'}{' '}
+                  smoke-free
+                </Text>
+              </View>
+            </View>
+          </Card.Content>
+        </Card>
+
         {/* Log Smoking Button */}
         <Button
           mode='contained'
@@ -305,5 +331,15 @@ const styles = StyleSheet.create({
   },
   insightText: {
     flex: 1,
+  },
+  streakCard: {
+    marginBottom: 16,
+  },
+  streakLabel: {
+    marginBottom: 8,
+    opacity: 0.7,
+  },
+  streakCount: {
+    fontWeight: 'bold',
   },
 });
