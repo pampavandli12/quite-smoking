@@ -167,7 +167,7 @@ export default function StatsPage() {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={{
         paddingTop: insets.top + 16,
-        paddingBottom: 32,
+        paddingBottom: 120,
       }}
     >
       <Surface style={styles.content} elevation={0}>

@@ -4,10 +4,11 @@ import {
   getWeeklyBreakdown,
   getYesterdayStats,
   logSmokingEvent,
+  getNonSmokingStreak,
 } from '@/db';
 import TriggerBottomSheet from '@/components/TriggerBottomSheet';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
   Card,
@@ -17,6 +18,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Background } from '@react-navigation/elements';
 
 export default function HomePage() {
   const theme = useTheme();
@@ -25,6 +27,7 @@ export default function HomePage() {
   const [yesterdayCount, setYesterdayCount] = useState(0);
   const [todayLogs, setTodayLogs] = useState<any[]>([]);
   const [weeklyData, setWeeklyData] = useState([0, 0, 0, 0, 0, 0, 0]);
+  const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState(false);
   const [isTriggerSheetVisible, setIsTriggerSheetVisible] = useState(false);
@@ -33,17 +36,19 @@ export default function HomePage() {
   const loadStats = useCallback(async () => {
     try {
       setLoading(true);
-      const [today, yesterday, logs, weekly] = await Promise.all([
+      const [today, yesterday, logs, weekly, streakDays] = await Promise.all([
         getTodayStats(),
         getYesterdayStats(),
         getTodayLogs(),
         getWeeklyBreakdown(),
+        getNonSmokingStreak(),
       ]);
 
       setTodayCount(today);
       setYesterdayCount(yesterday);
       setTodayLogs(logs);
       setWeeklyData(weekly);
+      setStreak(streakDays);
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
@@ -58,7 +63,8 @@ export default function HomePage() {
         const result = await logSmokingEvent(trigger ? [trigger] : []);
 
         if (result.success) {
-          setIsTriggerSheetVisible(false);
+          setIsTriggerSheetVisible(false); // Reset streak to 0 when logging a cigarette
+          setStreak(0);
           await loadStats();
         }
       } catch (error) {
@@ -107,6 +113,29 @@ export default function HomePage() {
             </Surface>
           </Card.Content>
         </Card>
+
+        {/* Streak card */}
+        <Card style={styles.streakCard}>
+          <Card.Content>
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+            >
+              <Icon source='fire' size={40} color={theme.colors.primary} />
+              <View>
+                <Text variant='titleMedium' style={styles.streakLabel}>
+                  Current Streak
+                </Text>
+                <Text variant='displaySmall' style={styles.streakCount}>
+                  {streak}
+                </Text>
+                <Text variant='bodySmall' style={{ opacity: 0.7 }}>
+                  {streak} day{streak !== 1 ? 's' : ''} smoke-free
+                </Text>
+              </View>
+            </View>
+          </Card.Content>
+        </Card>
+
         {/* Log Smoking Button */}
         <Button
           mode='contained'
@@ -305,5 +334,15 @@ const styles = StyleSheet.create({
   },
   insightText: {
     flex: 1,
+  },
+  streakCard: {
+    marginBottom: 16,
+  },
+  streakLabel: {
+    marginBottom: 8,
+    opacity: 0.7,
+  },
+  streakCount: {
+    fontWeight: 'bold',
   },
 });

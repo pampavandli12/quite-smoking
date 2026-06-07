@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from './client';
-import { smokingLog, smokingLogTriggers } from './schema';
+import { smokingLog, smokingLogTriggers, userSmokingSettings } from './schema';
 
 // Insert a smoking log entry
 export async function logSmokingEvent(triggers: string[] = []) {
@@ -30,6 +30,19 @@ export async function logSmokingEvent(triggers: string[] = []) {
 export async function getAllSmokingLogs() {
   try {
     const logs = db.select().from(smokingLog).all();
+
+    // Filter out logs with invalid or ancient timestamps (bad data)
+    const validLogs = (logs || []).filter((log) => {
+      const d = new Date(log.timestamp);
+      if (isNaN(d.getTime())) return false;
+      // ignore anything before year 2000 as invalid/ancient
+      return d.getFullYear() >= 2000;
+    });
+
+    // If there are no valid logs yet, user hasn't started tracking
+    if (!validLogs || validLogs.length === 0) {
+      return 0;
+    }
     return logs;
   } catch (error) {
     console.error('Error fetching smoking logs:', error);
@@ -357,6 +370,45 @@ export async function getYearlyBreakdown() {
   }
 }
 
+// --- User smoking settings (cigarettes per day & cost) ---
+export async function getSmokingSettings() {
+  try {
+    const rows = db.select().from(userSmokingSettings).all();
+    if (!rows || rows.length === 0) return null;
+
+    // Return the most recent settings (by createdAt)
+    const sorted = rows.sort((a: any, b: any) => b.createdAt - a.createdAt);
+    const s = sorted[0];
+    return {
+      id: s.id,
+      cigarettesPerDay: s.cigarettesPerDay,
+      costPerCigaretteCents: s.costPerCigaretteCents,
+      createdAt: s.createdAt,
+    };
+  } catch (error) {
+    console.error('Error fetching smoking settings:', error);
+    return null;
+  }
+}
+
+export async function setSmokingSettings(
+  cigarettesPerDay: number,
+  costPerCigarette: number,
+) {
+  try {
+    const cents = Math.round(costPerCigarette * 100);
+    const result = await db
+      .insert(userSmokingSettings)
+      .values({ cigarettesPerDay, costPerCigaretteCents: cents })
+      .returning();
+
+    return { success: true, result };
+  } catch (error) {
+    console.error('Error saving smoking settings:', error);
+    return { success: false, error };
+  }
+}
+
 // Get top trigger from the last 7 days
 export async function getTopTrigger() {
   try {
@@ -430,5 +482,84 @@ export async function getTop5Triggers() {
   } catch (error) {
     console.error('Error fetching top 5 triggers:', error);
     return [];
+  }
+}
+
+// Calculate consecutive non-smoking days streak
+export async function getNonSmokingStreak() {
+  try {
+    const logs = db.select().from(smokingLog).all();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Filter out logs with invalid or ancient timestamps (bad data)
+    const validLogs = (logs || []).filter((log) => {
+      const d = new Date(log.timestamp);
+      if (isNaN(d.getTime())) return false;
+      // ignore anything before year 2000 as invalid/ancient
+      return d.getFullYear() >= 2000;
+    });
+
+    // If there are no valid logs yet, user hasn't started tracking
+    if (!validLogs || validLogs.length === 0) {
+      return 0;
+    }
+
+    // Check if user smoked today
+    const todayStart = new Date(today);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const smokedToday = validLogs.some((log) => {
+      const logDate = new Date(log.timestamp);
+      return logDate >= todayStart && logDate <= todayEnd;
+    });
+
+    // If smoked today, streak is 0
+    if (smokedToday) {
+      return 0;
+    }
+
+    // Count consecutive non-smoking days going backwards from yesterday
+    let streak = 0;
+    let checkDate = new Date(today);
+    checkDate.setDate(checkDate.getDate() - 1); // Start from yesterday
+
+    // Determine earliest valid log date so we don't count before tracking began
+    const earliestLogDate = new Date(
+      Math.min(...validLogs.map((l) => new Date(l.timestamp).getTime())),
+    );
+    earliestLogDate.setHours(0, 0, 0, 0);
+
+    while (true) {
+      // If we've gone before the earliest log, stop counting — user hadn't started
+      if (checkDate < earliestLogDate) break;
+
+      const dayStart = new Date(checkDate);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(checkDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const smokedOnDay = validLogs.some((log) => {
+        const logDate = new Date(log.timestamp);
+        return logDate >= dayStart && logDate <= dayEnd;
+      });
+
+      if (smokedOnDay) {
+        break; // Found a day with smoking, stop counting
+      }
+
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+
+      // Safety cap
+      if (streak > 10000) break;
+    }
+
+    return streak;
+  } catch (error) {
+    console.error('Error calculating non-smoking streak:', error);
+    return 0;
   }
 }

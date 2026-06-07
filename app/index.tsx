@@ -4,6 +4,7 @@ import PurchaseService, {
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { getSmokingSettings } from '@/db/queries';
 import {
   ActivityIndicator,
   Alert,
@@ -22,6 +23,7 @@ import {
 } from 'react-native-paper';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { URL_LINKS } from '@/utils/constants';
 
 const PAYWALL_BYPASS = Constants.expoConfig?.extra?.PAYWALL_BYPASS === 'true';
 export default function SubscriptionPage() {
@@ -33,12 +35,26 @@ export default function SubscriptionPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (PAYWALL_BYPASS) {
-      router.replace('/(tabs)/home');
-      return;
-    }
-    checkSubscription();
-    loadOfferings();
+    (async () => {
+      if (PAYWALL_BYPASS) {
+        router.replace('/(tabs)/home');
+        return;
+      }
+
+      // Ensure user has provided cigarettes/day and cost before showing paywall
+      try {
+        const settings = await getSmokingSettings();
+        if (!settings) {
+          router.replace('/setup-smoking');
+          return;
+        }
+      } catch (err) {
+        console.error('Error checking smoking settings:', err);
+      }
+
+      checkSubscription();
+      loadOfferings();
+    })();
   }, []);
 
   const checkSubscription = async () => {
@@ -108,7 +124,6 @@ export default function SubscriptionPage() {
         );
       }
     } catch (error) {
-      console.error('Purchase error:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -177,7 +192,7 @@ export default function SubscriptionPage() {
     );
   }
   const redirectToPrivacyPolicy = () => {
-    const url = 'https://pampavandli12.github.io/quit-smoking-privacy/';
+    const url = URL_LINKS.privacy;
     Linking.openURL(url).catch((err) =>
       console.error('Failed to open URL:', err),
     );
@@ -196,10 +211,6 @@ export default function SubscriptionPage() {
         <Text variant='bodyLarge' style={styles.pillText}>
           7 days completely free
         </Text>
-      </Surface>
-
-      {/* Title Section */}
-      <Surface style={styles.titleSection} elevation={0}>
         <Text variant='headlineMedium' style={styles.title}>
           Unlock your quit journey
         </Text>
@@ -216,6 +227,7 @@ export default function SubscriptionPage() {
           What You&apos;ll Get
         </Text>
 
+        {/* Smoking history */}
         <Surface style={styles.featureItem} elevation={0}>
           <Icon source='chart-bar' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
@@ -228,7 +240,34 @@ export default function SubscriptionPage() {
             </Text>
           </Surface>
         </Surface>
+        {/* Money saved */}
+        <Surface style={styles.featureItem} elevation={0}>
+          <Icon source='currency-inr' size={24} color='#4CAF50' />
+          <Surface style={styles.featureTextContainer} elevation={0}>
+            <Text variant='bodyLarge' style={styles.featureTitle}>
+              Money saved
+            </Text>
+            <Text variant='bodyMedium' style={styles.featureDescription}>
+              Watch your savings grow as you stay smoke-free. It&apos;s not just
+              good for your health, but also your wallet!
+            </Text>
+          </Surface>
+        </Surface>
+        {/* Smoke-free streaks */}
+        <Surface style={styles.featureItem} elevation={0}>
+          <Icon source='calendar-check' size={24} color='#4CAF50' />
+          <Surface style={styles.featureTextContainer} elevation={0}>
+            <Text variant='bodyLarge' style={styles.featureTitle}>
+              Smoke-free streaks
+            </Text>
+            <Text variant='bodyMedium' style={styles.featureDescription}>
+              Track your streak, hit milestones, and feel the momentum of every
+              smoke-free day.
+            </Text>
+          </Surface>
+        </Surface>
 
+        {/* Trigger analysis */}
         <Surface style={styles.featureItem} elevation={0}>
           <Icon source='fire' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
@@ -241,7 +280,7 @@ export default function SubscriptionPage() {
             </Text>
           </Surface>
         </Surface>
-
+        {/* Peak smoking hours */}
         <Surface style={styles.featureItem} elevation={0}>
           <Icon source='clock-time-eleven-outline' size={24} color='#4CAF50' />
           <Surface style={styles.featureTextContainer} elevation={0}>
@@ -251,19 +290,6 @@ export default function SubscriptionPage() {
             <Text variant='bodyMedium' style={styles.featureDescription}>
               See exactly which hours of the day you smoke most — awareness is
               the first step.
-            </Text>
-          </Surface>
-        </Surface>
-
-        <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='calendar-check' size={24} color='#4CAF50' />
-          <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant='bodyLarge' style={styles.featureTitle}>
-              Smoke-free streaks
-            </Text>
-            <Text variant='bodyMedium' style={styles.featureDescription}>
-              Track your streak, hit milestones, and feel the momentum of every
-              smoke-free day.
             </Text>
           </Surface>
         </Surface>
@@ -311,12 +337,6 @@ export default function SubscriptionPage() {
 
       {/* Payment Methods */}
       <Surface style={styles.paymentSection} elevation={0}>
-        {/* <Surface style={styles.paymentIcons} elevation={0}>
-          <Icon source="credit-card" size={24} color={theme.colors.onSurface} />
-          <Icon source="apple" size={24} color={theme.colors.onSurface} />
-          <Icon source="google" size={24} color={theme.colors.onSurface} />
-          <Icon source="cash" size={24} color={theme.colors.onSurface} />
-        </Surface> */}
         <Surface style={styles.secureRow} elevation={0}>
           <Icon source='lock' size={16} color={theme.colors.onSurfaceVariant} />
           <Text variant='bodySmall' style={styles.secureText}>
@@ -347,17 +367,6 @@ export default function SubscriptionPage() {
       >
         Restore Purchase
       </Button>
-
-      {/* Skip Button (for testing) */}
-      {/* <Button
-        mode="text"
-        style={styles.skipButton}
-        textColor={theme.colors.onSurfaceVariant}
-        onPress={handleSkip}
-        disabled={loading}
-      >
-        Skip for now
-      </Button> */}
 
       {/* privacy policy */}
       <Button
@@ -404,6 +413,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
+    marginTop: 12,
   },
   subtitle: {
     textAlign: 'center',

@@ -5,6 +5,7 @@ import {
   getWeeklyBreakdown,
   getWeekStats,
   getYearlyBreakdown,
+  getSmokingSettings,
 } from '@/db';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -282,6 +283,10 @@ export default function StatsTimelineChart({
   const [currentTotal, setCurrentTotal] = useState(0);
   const [previousTotal, setPreviousTotal] = useState(0);
   const [chartData, setChartData] = useState<number[]>(EMPTY_DATA);
+  const [smokingSettings, setSmokingSettings] = useState<{
+    cigarettesPerDay: number;
+    costPerCigaretteCents: number;
+  } | null>(null);
 
   const average = getAverage(period, currentTotal);
   const comparisonLabel = getComparisonLabel(period);
@@ -289,6 +294,39 @@ export default function StatsTimelineChart({
     previousTotal > 0
       ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
       : 0;
+
+  // Calculate money saved
+  let moneySaved = 0;
+  let cigarettesSaved = 0;
+
+  if (smokingSettings) {
+    let cigarettesIfNormal = 0;
+
+    if (period === 'week') {
+      cigarettesIfNormal = smokingSettings.cigarettesPerDay * 7;
+    } else if (period === 'month') {
+      const today = new Date();
+      const daysInMonth = new Date(
+        today.getFullYear(),
+        today.getMonth() + 1,
+        0,
+      ).getDate();
+      cigarettesIfNormal = smokingSettings.cigarettesPerDay * daysInMonth;
+    } else {
+      cigarettesIfNormal = smokingSettings.cigarettesPerDay * 365;
+    }
+
+    // Can be negative if smoking more than normal
+    cigarettesSaved = cigarettesIfNormal - currentTotal;
+    moneySaved = Math.round(
+      (cigarettesSaved * smokingSettings.costPerCigaretteCents) / 100,
+    );
+  }
+
+  const costPerCigaretteDisplay =
+    smokingSettings && smokingSettings.costPerCigaretteCents
+      ? (smokingSettings.costPerCigaretteCents / 100).toFixed(2)
+      : '0.00';
 
   const summary = useMemo(
     () => ({
@@ -326,6 +364,22 @@ export default function StatsTimelineChart({
   useEffect(() => {
     loadChart();
   }, [loadChart]);
+
+  // Load smoking settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await getSmokingSettings();
+        if (settings) {
+          setSmokingSettings(settings);
+        }
+      } catch (error) {
+        console.error('Error loading smoking settings:', error);
+      }
+    };
+
+    loadSettings();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -377,6 +431,96 @@ export default function StatsTimelineChart({
   return (
     <>
       <AnimatedPeriodSelector period={period} onPeriodChange={setPeriod} />
+
+      {/* Money Saved Card */}
+      {smokingSettings &&
+        (currentTotal > 0 || chartData.some((v) => v > 0)) && (
+          <Card
+            style={[
+              styles.moneySavedCard,
+              {
+                backgroundColor:
+                  moneySaved >= 0
+                    ? theme.dark
+                      ? 'rgba(76, 175, 80, 0.15)'
+                      : '#E8F5E9'
+                    : theme.dark
+                      ? 'rgba(244, 67, 54, 0.15)'
+                      : '#FFEBEE',
+                marginBottom: 24,
+              },
+            ]}
+          >
+            <Card.Content>
+              <View style={styles.moneySavedContent}>
+                <Surface
+                  style={[
+                    styles.moneySavedIconContainer,
+                    {
+                      backgroundColor:
+                        moneySaved >= 0 ? theme.colors.primary : '#F44336',
+                    },
+                  ]}
+                  elevation={0}
+                >
+                  <Text style={styles.moneySavedIcon}>
+                    <Icon
+                      source='cash'
+                      size={40}
+                      color={
+                        theme.dark
+                          ? theme.colors.onPrimary
+                          : theme.colors.surface
+                      }
+                    />
+                  </Text>
+                </Surface>
+
+                <View style={styles.moneySavedTextContainer}>
+                  <Text
+                    variant='bodyMedium'
+                    style={[
+                      styles.moneySavedLabel,
+                      { color: theme.colors.onSurface, opacity: 0.8 },
+                    ]}
+                  >
+                    {moneySaved >= 0 ? 'Money Saved' : 'Money Spent'}{' '}
+                    {period === 'week'
+                      ? 'This Week'
+                      : period === 'month'
+                        ? 'This Month'
+                        : 'This Year'}
+                  </Text>
+                  <Text
+                    variant='displaySmall'
+                    style={[
+                      styles.moneySavedAmount,
+                      {
+                        color:
+                          moneySaved >= 0 ? theme.colors.primary : '#F44336',
+                      },
+                    ]}
+                  >
+                    {moneySaved >= 0 ? '$' : '-$'}
+                    {Math.abs(moneySaved)}
+                  </Text>
+                  <Text
+                    variant='bodySmall'
+                    style={[
+                      styles.moneySavedFormula,
+                      { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
+                    ]}
+                  >
+                    ${costPerCigaretteDisplay}/cigarette ×{' '}
+                    {moneySaved >= 0 ? '' : '+'}
+                    {Math.abs(cigarettesSaved)}{' '}
+                    {moneySaved >= 0 ? 'avoided' : 'extra'}
+                  </Text>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
+        )}
 
       <Surface style={styles.chartContainer} elevation={0}>
         <LineChart
@@ -556,5 +700,38 @@ const styles = StyleSheet.create({
   },
   changeTextRed: {
     color: '#F44336',
+  },
+  moneySavedCard: {
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+  moneySavedContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  moneySavedIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moneySavedIcon: {
+    fontSize: 28,
+  },
+  moneySavedTextContainer: {
+    flex: 1,
+  },
+  moneySavedLabel: {
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  moneySavedAmount: {
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  moneySavedFormula: {
+    fontWeight: '400',
   },
 });
