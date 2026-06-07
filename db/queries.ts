@@ -471,3 +471,62 @@ export async function getTop5Triggers() {
     return [];
   }
 }
+
+// Calculate consecutive non-smoking days streak
+export async function getNonSmokingStreak() {
+  try {
+    const logs = db.select().from(smokingLog).all();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Check if user smoked today
+    const todayStart = new Date(today);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const smokedToday = logs.some((log) => {
+      const logDate = new Date(log.timestamp);
+      return logDate >= todayStart && logDate <= todayEnd;
+    });
+
+    // If smoked today, streak is 0
+    if (smokedToday) {
+      return 0;
+    }
+
+    // Count consecutive non-smoking days going backwards from yesterday
+    let streak = 0;
+    let checkDate = new Date(today);
+    checkDate.setDate(checkDate.getDate() - 1); // Start from yesterday
+
+    while (true) {
+      const dayStart = new Date(checkDate);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(checkDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const smokedOnDay = logs.some((log) => {
+        const logDate = new Date(log.timestamp);
+        return logDate >= dayStart && logDate <= dayEnd;
+      });
+
+      if (smokedOnDay) {
+        break; // Found a day with smoking, stop counting
+      }
+
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+
+      // Prevent infinite loop - cap at a reasonable number
+      if (streak > 10000) {
+        break;
+      }
+    }
+
+    return streak;
+  } catch (error) {
+    console.error('Error calculating non-smoking streak:', error);
+    return 0;
+  }
+}
