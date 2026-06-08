@@ -1,13 +1,6 @@
 import { URL_LINKS } from '@/utils/constants';
 import React from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  GestureResponderEvent,
-  Linking,
-  Alert,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, Linking, Alert } from 'react-native';
 import {
   useTheme,
   Text,
@@ -35,11 +28,9 @@ const Settings = () => {
 
   const sendFeedback = async () => {
     const subject = encodeURIComponent('Feedback - Quit Smoking App');
-    const mailto = `${URL_LINKS.feedback}?subject=${subject}`;
+    const mailto = `mailto:${URL_LINKS.feedback}?subject=${subject}`;
     try {
-      const can = await Linking.canOpenURL(mailto);
-      if (can) await Linking.openURL(mailto);
-      else Alert.alert('No mail app available');
+      await Linking.openURL(mailto);
     } catch (err) {
       console.error('Error opening mail app', err);
       Alert.alert('Error', 'Could not open mail app');

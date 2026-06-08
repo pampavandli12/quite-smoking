@@ -43,13 +43,6 @@ export default function TabLayout() {
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        animation: 'shift',
-        transitionSpec: {
-          animation: 'timing',
-          config: {
-            duration: 220,
-          },
-        },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceDisabled,
         tabBarStyle: {
