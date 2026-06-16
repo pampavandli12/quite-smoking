@@ -18,7 +18,6 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Background } from '@react-navigation/elements';
 
 export default function HomePage() {
   const theme = useTheme();

@@ -501,7 +501,7 @@ export default function StatsTimelineChart({
                       },
                     ]}
                   >
-                    {moneySaved >= 0 ? '$' : '-$'}
+                    {moneySaved >= 0 ? '₹' : '-₹'}
                     {Math.abs(moneySaved)}
                   </Text>
                   <Text
@@ -511,7 +511,7 @@ export default function StatsTimelineChart({
                       { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
                     ]}
                   >
-                    ${costPerCigaretteDisplay}/cigarette ×{' '}
+                    ₹{costPerCigaretteDisplay}/cigarette ×{' '}
                     {moneySaved >= 0 ? '' : '+'}
                     {Math.abs(cigarettesSaved)}{' '}
                     {moneySaved >= 0 ? 'avoided' : 'extra'}
