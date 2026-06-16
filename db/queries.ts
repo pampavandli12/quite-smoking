@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
-import { getDbAsync } from "./client";
-import { smokingLog, smokingLogTriggers } from "./schema";
+import { eq } from 'drizzle-orm';
+import { db } from './client';
+import { smokingLog, smokingLogTriggers, userSmokingSettings } from './schema';
 
 // Insert a smoking log entry
 export async function logSmokingEvent(triggers: string[] = []) {
@@ -23,7 +23,7 @@ export async function logSmokingEvent(triggers: string[] = []) {
 
     return { success: true, logId };
   } catch (error) {
-    console.error("Error logging smoking event:", error);
+    console.error('Error logging smoking event:', error);
     return { success: false, error };
   }
 }
@@ -33,9 +33,22 @@ export async function getAllSmokingLogs() {
   try {
     const db = await getDbAsync();
     const logs = db.select().from(smokingLog).all();
+
+    // Filter out logs with invalid or ancient timestamps (bad data)
+    const validLogs = (logs || []).filter((log) => {
+      const d = new Date(log.timestamp);
+      if (isNaN(d.getTime())) return false;
+      // ignore anything before year 2000 as invalid/ancient
+      return d.getFullYear() >= 2000;
+    });
+
+    // If there are no valid logs yet, user hasn't started tracking
+    if (!validLogs || validLogs.length === 0) {
+      return 0;
+    }
     return logs;
   } catch (error) {
-    console.error("Error fetching smoking logs:", error);
+    console.error('Error fetching smoking logs:', error);
     return [];
   }
 }
@@ -74,7 +87,7 @@ export async function getSmokingLogsWithTriggers() {
 
     return groupedLogs;
   } catch (error) {
-    console.error("Error fetching smoking logs with triggers:", error);
+    console.error('Error fetching smoking logs with triggers:', error);
     return [];
   }
 }
@@ -96,7 +109,7 @@ export async function getSmokingCountByDateRange(
 
     return filtered.length;
   } catch (error) {
-    console.error("Error fetching smoking count:", error);
+    console.error('Error fetching smoking count:', error);
     return 0;
   }
 }
@@ -107,14 +120,16 @@ export async function deleteSmokingLog(logId: number) {
     const db = await getDbAsync();
 
     // Delete triggers first (foreign key constraint)
-    await db.delete(smokingLogTriggers).where(eq(smokingLogTriggers.logId, logId));
+    await db
+      .delete(smokingLogTriggers)
+      .where(eq(smokingLogTriggers.logId, logId));
 
     // Delete the log
     await db.delete(smokingLog).where(eq(smokingLog.id, logId));
 
     return { success: true };
   } catch (error) {
-    console.error("Error deleting smoking log:", error);
+    console.error('Error deleting smoking log:', error);
     return { success: false, error };
   }
 }
@@ -152,7 +167,7 @@ export async function getWeekStats() {
     );
     return count;
   } catch (error) {
-    console.error("Error fetching week stats:", error);
+    console.error('Error fetching week stats:', error);
     return 0;
   }
 }
@@ -165,6 +180,9 @@ export async function getWeeklyBreakdown() {
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
 
     const logs = db.select().from(smokingLog).all();
 
@@ -173,7 +191,7 @@ export async function getWeeklyBreakdown() {
 
     logs.forEach((log) => {
       const logDate = new Date(log.timestamp);
-      if (logDate >= startOfWeek) {
+      if (logDate >= startOfWeek && logDate <= endOfWeek) {
         const dayIndex = logDate.getDay();
         dayCounts[dayIndex]++;
       }
@@ -181,7 +199,7 @@ export async function getWeeklyBreakdown() {
 
     return dayCounts;
   } catch (error) {
-    console.error("Error fetching weekly breakdown:", error);
+    console.error('Error fetching weekly breakdown:', error);
     return [0, 0, 0, 0, 0, 0, 0];
   }
 }
@@ -244,7 +262,7 @@ export async function getPreviousWeekStats() {
     );
     return count;
   } catch (error) {
-    console.error("Error fetching previous week stats:", error);
+    console.error('Error fetching previous week stats:', error);
     return 0;
   }
 }
@@ -262,13 +280,13 @@ export async function getDetailedWeeklyBreakdown() {
 
     const breakdown = [];
     const dayNames = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
     ];
 
     for (let i = 0; i < 7; i++) {
@@ -288,9 +306,9 @@ export async function getDetailedWeeklyBreakdown() {
 
       breakdown.push({
         day: dayNames[currentDay.getDay()],
-        date: currentDay.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
+        date: currentDay.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
         }),
         count: dayLogs.length,
         progress: dayLogs.length / 20, // Assume max 20 per day
@@ -299,65 +317,107 @@ export async function getDetailedWeeklyBreakdown() {
 
     return breakdown;
   } catch (error) {
-    console.error("Error fetching detailed weekly breakdown:", error);
+    console.error('Error fetching detailed weekly breakdown:', error);
     return [];
   }
 }
 
-// Get monthly breakdown (30 days)
+// Get monthly breakdown for the current calendar month, grouped into 4 weeks.
 export async function getMonthlyBreakdown() {
   try {
     const db = await getDbAsync();
     const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
     const logs = db.select().from(smokingLog).all();
 
-    const dayCounts = new Array(30).fill(0);
+    const weekCounts = new Array(4).fill(0);
 
     logs.forEach((log) => {
       const logDate = new Date(log.timestamp);
-      const daysDiff = Math.floor(
-        (today.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      if (daysDiff >= 0 && daysDiff < 30) {
-        dayCounts[29 - daysDiff]++;
+      if (logDate >= startOfMonth && logDate <= endOfMonth) {
+        const weekIndex = Math.min(Math.floor((logDate.getDate() - 1) / 7), 3);
+        weekCounts[weekIndex]++;
       }
     });
 
-    return dayCounts;
+    return weekCounts;
   } catch (error) {
-    console.error("Error fetching monthly breakdown:", error);
-    return new Array(30).fill(0);
+    console.error('Error fetching monthly breakdown:', error);
+    return new Array(4).fill(0);
   }
 }
 
-// Get yearly breakdown (12 months)
+// Get yearly breakdown for the current calendar year.
 export async function getYearlyBreakdown() {
   try {
     const db = await getDbAsync();
     const today = new Date();
+    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
     const logs = db.select().from(smokingLog).all();
 
     const monthCounts = new Array(12).fill(0);
 
     logs.forEach((log) => {
       const logDate = new Date(log.timestamp);
-      const yearDiff = today.getFullYear() - logDate.getFullYear();
-      const monthDiff = today.getMonth() - logDate.getMonth();
-      const totalMonthsDiff = yearDiff * 12 + monthDiff;
-
-      if (totalMonthsDiff >= 0 && totalMonthsDiff < 12) {
-        monthCounts[11 - totalMonthsDiff]++;
+      if (logDate >= startOfYear && logDate <= endOfYear) {
+        monthCounts[logDate.getMonth()]++;
       }
     });
 
     return monthCounts;
   } catch (error) {
-    console.error("Error fetching yearly breakdown:", error);
+    console.error('Error fetching yearly breakdown:', error);
     return new Array(12).fill(0);
+  }
+}
+
+// --- User smoking settings (cigarettes per day & cost) ---
+export async function getSmokingSettings() {
+  try {
+    const rows = db.select().from(userSmokingSettings).all();
+    if (!rows || rows.length === 0) return null;
+
+    // Return the most recent settings (by createdAt)
+    const sorted = rows.sort((a: any, b: any) => b.createdAt - a.createdAt);
+    const s = sorted[0];
+    return {
+      id: s.id,
+      cigarettesPerDay: s.cigarettesPerDay,
+      costPerCigaretteCents: s.costPerCigaretteCents,
+      createdAt: s.createdAt,
+    };
+  } catch (error) {
+    console.error('Error fetching smoking settings:', error);
+    return null;
+  }
+}
+
+export async function setSmokingSettings(
+  cigarettesPerDay: number,
+  costPerCigarette: number,
+) {
+  try {
+    const cents = Math.round(costPerCigarette * 100);
+    const result = await db
+      .insert(userSmokingSettings)
+      .values({ cigarettesPerDay, costPerCigaretteCents: cents })
+      .returning();
+
+    return { success: true, result };
+  } catch (error) {
+    console.error('Error saving smoking settings:', error);
+    return { success: false, error };
   }
 }
 
@@ -397,7 +457,7 @@ export async function getTopTrigger() {
 
     return topTrigger;
   } catch (error) {
-    console.error("Error fetching top trigger:", error);
+    console.error('Error fetching top trigger:', error);
     return null;
   }
 }
@@ -434,50 +494,86 @@ export async function getTop5Triggers() {
 
     return sortedTriggers;
   } catch (error) {
-    console.error("Error fetching top 5 triggers:", error);
+    console.error('Error fetching top 5 triggers:', error);
     return [];
   }
 }
 
-// Get last 3 days breakdown
-export async function getLast3DaysBreakdown() {
+// Calculate consecutive non-smoking days streak
+export async function getNonSmokingStreak() {
   try {
-    const db = await getDbAsync();
-    const today = new Date();
     const logs = db.select().from(smokingLog).all();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    // Initialize counts for last 3 days (day before yesterday, yesterday, today)
-    const dayCounts = [0, 0, 0];
-
-    logs.forEach((log) => {
-      const logDate = new Date(log.timestamp);
-      const todayStart = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-      );
-      const logStart = new Date(
-        logDate.getFullYear(),
-        logDate.getMonth(),
-        logDate.getDate(),
-      );
-
-      // Calculate days difference
-      const diffTime = todayStart.getTime() - logStart.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 0) {
-        dayCounts[2]++; // Today
-      } else if (diffDays === 1) {
-        dayCounts[1]++; // Yesterday
-      } else if (diffDays === 2) {
-        dayCounts[0]++; // Day before yesterday
-      }
+    // Filter out logs with invalid or ancient timestamps (bad data)
+    const validLogs = (logs || []).filter((log) => {
+      const d = new Date(log.timestamp);
+      if (isNaN(d.getTime())) return false;
+      // ignore anything before year 2000 as invalid/ancient
+      return d.getFullYear() >= 2000;
     });
 
-    return dayCounts;
+    // If there are no valid logs yet, user hasn't started tracking
+    if (!validLogs || validLogs.length === 0) {
+      return 0;
+    }
+
+    // Check if user smoked today
+    const todayStart = new Date(today);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const smokedToday = validLogs.some((log) => {
+      const logDate = new Date(log.timestamp);
+      return logDate >= todayStart && logDate <= todayEnd;
+    });
+
+    // If smoked today, streak is 0
+    if (smokedToday) {
+      return 0;
+    }
+
+    // Count consecutive non-smoking days going backwards from yesterday
+    let streak = 0;
+    let checkDate = new Date(today);
+    checkDate.setDate(checkDate.getDate() - 1); // Start from yesterday
+
+    // Determine earliest valid log date so we don't count before tracking began
+    const earliestLogDate = new Date(
+      Math.min(...validLogs.map((l) => new Date(l.timestamp).getTime())),
+    );
+    earliestLogDate.setHours(0, 0, 0, 0);
+
+    while (true) {
+      // If we've gone before the earliest log, stop counting — user hadn't started
+      if (checkDate < earliestLogDate) break;
+
+      const dayStart = new Date(checkDate);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(checkDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const smokedOnDay = validLogs.some((log) => {
+        const logDate = new Date(log.timestamp);
+        return logDate >= dayStart && logDate <= dayEnd;
+      });
+
+      if (smokedOnDay) {
+        break; // Found a day with smoking, stop counting
+      }
+
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+
+      // Safety cap
+      if (streak > 10000) break;
+    }
+
+    return streak;
   } catch (error) {
-    console.error("Error fetching last 3 days breakdown:", error);
-    return [0, 0, 0];
+    console.error('Error calculating non-smoking streak:', error);
+    return 0;
   }
 }

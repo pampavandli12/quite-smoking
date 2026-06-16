@@ -1,4 +1,4 @@
-package com.pampapathi.quitsmoking
+package com.dailyapplabs.quitsmoke
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

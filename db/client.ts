@@ -1,83 +1,12 @@
-import { drizzle } from "drizzle-orm/expo-sqlite";
-import { importDatabaseFromAssetAsync, openDatabaseSync } from "expo-sqlite";
-import * as schema from "./schema";
+import { drizzle } from 'drizzle-orm/expo-sqlite';
+import { importDatabaseFromAssetAsync, openDatabaseSync } from 'expo-sqlite';
+import * as schema from './schema';
 
-const DB_NAME = "quitSmoking.db";
-const DB_ASSET_ID = require("../assets/quitSmoking.db");
-const FORCE_OVERWRITE_WITH_BUNDLED_DB = true;
+const expoDb = openDatabaseSync("quitSmoking.db");
 
-type AppDatabase = ReturnType<typeof drizzle>;
+export const db = drizzle(expoDb, { schema });
 
-let dbInstance: AppDatabase | null = null;
-let initializationPromise: Promise<boolean> | null = null;
-
-function createDatabase() {
-  const expoDb = openDatabaseSync(DB_NAME);
-  return {
-    expoDb,
-    db: drizzle(expoDb, { schema }),
-  };
-}
-
-async function shiftBundledDataToCurrentDate(
-  expoDb: ReturnType<typeof openDatabaseSync>,
-) {
-  const latestRow = await expoDb.getFirstAsync<{ latest: string | null }>(
-    "SELECT MAX(timestamp) AS latest FROM smoking_log;",
-  );
-
-  if (!latestRow?.latest) {
-    return;
-  }
-
-  const latestTimestamp = new Date(latestRow.latest.replace(" ", "T"));
-  if (Number.isNaN(latestTimestamp.getTime())) {
-    return;
-  }
-
-  const now = new Date();
-  const diffMs = now.getTime() - latestTimestamp.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-
-  if (diffSeconds <= 0) {
-    return;
-  }
-
-  await expoDb.runAsync(
-    `
-      UPDATE smoking_log
-      SET timestamp = datetime(strftime('%s', timestamp) + ?, 'unixepoch')
-      WHERE timestamp IS NOT NULL;
-    `,
-    diffSeconds,
-  );
-}
-
-export function getDb(): AppDatabase {
-  if (!dbInstance) {
-    throw new Error("Database has not been initialized yet.");
-  }
-
-  return dbInstance;
-}
-
-export async function getDbAsync(): Promise<AppDatabase> {
-  if (!dbInstance) {
-    const success = await initializeDatabase();
-    if (!success || !dbInstance) {
-      throw new Error("Database initialization failed.");
-    }
-  }
-
-  return dbInstance;
-}
-
-export const db = new Proxy({} as AppDatabase, {
-  get(_target, prop, receiver) {
-    return Reflect.get(getDb() as object, prop, receiver);
-  },
-});
-
+// Initialize database tables
 export async function initializeDatabase() {
   if (dbInstance) {
     return true;
@@ -115,17 +44,10 @@ export async function initializeDatabase() {
         );
       `);
 
-      await shiftBundledDataToCurrentDate(expoDb);
-
-      console.log("Database initialized successfully with bundled test data");
-      return true;
-    } catch (error) {
-      console.error("Error initializing database:", error);
-      return false;
-    } finally {
-      initializationPromise = null;
-    }
-  })();
-
-  return initializationPromise;
+    console.log("Database initialized successfully");
+    return true;
+  } catch (error) {
+    console.error("Error initializing database:", error);
+    return false;
+  }
 }

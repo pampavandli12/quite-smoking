@@ -1,110 +1,95 @@
 import {
   getDetailedWeeklyBreakdown,
-  getMonthlyBreakdown,
-  getPreviousWeekStats,
   getTodayStats,
   getTop5Triggers,
   getTopTrigger,
-  getWeeklyBreakdown,
-  getWeekStats,
-  getYearlyBreakdown,
   getYesterdayStats,
 } from '@/db';
+import StatsTimelineChart, {
+  type StatsPeriod,
+  type TimelineSummary,
+} from '@/components/StatsTimelineChart';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
-import {
-  Card,
-  Icon,
-  SegmentedButtons,
-  Surface,
-  Text,
-  useTheme,
-} from 'react-native-paper';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Card, Icon, Surface, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const fallbackMessages = [
+  'Every cigarette skipped is a victory 🏆',
+  'Within 20 minutes of not smoking, your heart rate drops ❤️',
+  'Your lungs start to heal the moment you reduce smoking 🫁',
+  "You're stronger than your cravings 💪",
+  'Small steps every day lead to big changes 🌟',
+];
+
+function getProgressMessage(today: number, yesterday: number) {
+  if (today < yesterday) {
+    return 'Great job! You smoked fewer cigarettes today than yesterday 🎉';
+  }
+
+  if (today > yesterday) {
+    return 'You smoked more today than yesterday. Think about what triggered it 💭';
+  }
+
+  return 'Consistent! You smoked the same as yesterday. Try to cut down tomorrow 💪';
+}
+
+function getTriggerMessage(trigger: string) {
+  switch (trigger) {
+    case 'stress':
+      return 'Stress seems to be your biggest trigger. Try deep breathing or a short walk instead 🧘';
+    case 'coffee':
+      return 'Coffee often makes you want to smoke. How about switching to tea once a day? ☕➡️🍵';
+    case 'alcohol':
+      return "Alcohol is a strong trigger for smoking. Plan ahead if you're going out 🍺";
+    case 'after meals':
+      return 'Smoking after meals is common. Try brushing your teeth or chewing gum instead 🪥';
+    case 'boredom':
+      return 'Boredom is a sneaky trigger. Keep your hands busy with a quick hobby or game 🎮';
+    case 'work pressure':
+      return 'Work pressure often drives smoking. Step away for a 2-minute walk instead 🚶';
+    case 'driving':
+      return 'Driving can be a strong trigger. Keep sugar-free mints in your car 🚗';
+    case 'phone scrolling / gaming':
+      return 'Scrolling or gaming often pairs with smoking. Try short breaks without a cigarette 📱';
+    case 'anxiety':
+      return 'Anxiety can make you reach for cigarettes. Try a 5-minute meditation instead 🧘';
+    case 'social situations':
+      return 'Social situations can be tough. Plan your response ahead of time 👥';
+    default:
+      return `Looks like "${trigger}" is your top trigger. Can you think of a healthy alternative? 💡`;
+  }
+}
+
+function getFallbackMessage() {
+  return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
+}
 
 export default function StatsPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [selectedPeriod, setSelectedPeriod] = useState<StatsPeriod>('week');
   const [currentTotal, setCurrentTotal] = useState(0);
   const [previousTotal, setPreviousTotal] = useState(0);
   const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
-  const [chartData, setChartData] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
   const [healthInsight, setHealthInsight] = useState('');
-  const [todayCount, setTodayCount] = useState(0);
-  const [yesterdayCount, setYesterdayCount] = useState(0);
   const [topTriggers, setTopTriggers] = useState<
     { trigger: string; count: number }[]
   >([]);
-
-  const screenWidth = Dimensions.get('window').width;
-
-  // Health insight message generators
-  const getProgressMessage = (today: number, yesterday: number) => {
-    if (today < yesterday) {
-      return 'Great job! You smoked fewer cigarettes today than yesterday 🎉';
-    } else if (today > yesterday) {
-      return 'You smoked more today than yesterday. Think about what triggered it 💭';
-    } else {
-      return 'Consistent! You smoked the same as yesterday. Try to cut down tomorrow 💪';
-    }
-  };
-
-  const getTriggerMessage = (trigger: string) => {
-    switch (trigger) {
-      case 'stress':
-        return 'Stress seems to be your biggest trigger. Try deep breathing or a short walk instead 🧘';
-      case 'coffee':
-        return 'Coffee often makes you want to smoke. How about switching to tea once a day? ☕➡️🍵';
-      case 'alcohol':
-        return "Alcohol is a strong trigger for smoking. Plan ahead if you're going out 🍺";
-      case 'after meals':
-        return 'Smoking after meals is common. Try brushing your teeth or chewing gum instead 🪥';
-      case 'boredom':
-        return 'Boredom is a sneaky trigger. Keep your hands busy with a quick hobby or game 🎮';
-      case 'work pressure':
-        return 'Work pressure often drives smoking. Step away for a 2-minute walk instead 🚶';
-      case 'driving':
-        return 'Driving can be a strong trigger. Keep sugar-free mints in your car 🚗';
-      case 'phone scrolling / gaming':
-        return 'Scrolling or gaming often pairs with smoking. Try short breaks without a cigarette 📱';
-      case 'anxiety':
-        return 'Anxiety can make you reach for cigarettes. Try a 5-minute meditation instead 🧘';
-      case 'social situations':
-        return 'Social situations can be tough. Plan your response ahead of time 👥';
-      default:
-        return `Looks like "${trigger}" is your top trigger. Can you think of a healthy alternative? 💡`;
-    }
-  };
-
-  const fallbackMessages = [
-    'Every cigarette skipped is a victory 🏆',
-    'Within 20 minutes of not smoking, your heart rate drops ❤️',
-    'Your lungs start to heal the moment you reduce smoking 🫁',
-    "You're stronger than your cravings 💪",
-    'Small steps every day lead to big changes 🌟',
-  ];
-
-  const getFallbackMessage = () => {
-    return fallbackMessages[
-      Math.floor(Math.random() * fallbackMessages.length)
-    ];
-  };
+  const percentageChange =
+    previousTotal > 0
+      ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
+      : 0;
 
   // Generate health insight
-  const generateHealthInsight = async () => {
+  const generateHealthInsight = useCallback(async () => {
     try {
       const [today, yesterday, topTrigger] = await Promise.all([
         getTodayStats(),
         getYesterdayStats(),
         getTopTrigger(),
       ]);
-
-      setTodayCount(today);
-      setYesterdayCount(yesterday);
 
       // Priority 1: Progress message if there's data
       if (today > 0 || yesterday > 0) {
@@ -124,42 +109,20 @@ export default function StatsPage() {
       console.error('Error generating health insight:', error);
       setHealthInsight(getFallbackMessage());
     }
-  };
+  }, []);
 
   // Load stats from database
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
-      setLoading(true);
-
       if (selectedPeriod === 'week') {
-        const [currentWeek, previousWeek, breakdown, weeklyData, triggers] =
-          await Promise.all([
-            getWeekStats(),
-            getPreviousWeekStats(),
-            getDetailedWeeklyBreakdown(),
-            getWeeklyBreakdown(),
-            getTop5Triggers(),
-          ]);
+        const [breakdown, triggers] = await Promise.all([
+          getDetailedWeeklyBreakdown(),
+          getTop5Triggers(),
+        ]);
 
-        setCurrentTotal(currentWeek);
-        setPreviousTotal(previousWeek);
         setDailyBreakdown(breakdown);
-        setChartData(weeklyData);
         setTopTriggers(triggers);
-      } else if (selectedPeriod === 'month') {
-        const monthlyData = await getMonthlyBreakdown();
-        const total = monthlyData.reduce((sum, val) => sum + val, 0);
-        setCurrentTotal(total);
-        setPreviousTotal(0); // Could implement previous month comparison
-        setChartData(monthlyData);
-        setDailyBreakdown([]);
-        setTopTriggers([]);
       } else {
-        const yearlyData = await getYearlyBreakdown();
-        const total = yearlyData.reduce((sum, val) => sum + val, 0);
-        setCurrentTotal(total);
-        setPreviousTotal(0); // Could implement previous year comparison
-        setChartData(yearlyData);
         setDailyBreakdown([]);
         setTopTriggers([]);
       }
@@ -168,114 +131,28 @@ export default function StatsPage() {
       await generateHealthInsight();
     } catch (error) {
       console.error('Error loading stats:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [generateHealthInsight, selectedPeriod]);
 
   useEffect(() => {
     loadStats();
-  }, [selectedPeriod]);
+  }, [loadStats]);
 
   // Reload stats when tab is focused
   useFocusEffect(
     useCallback(() => {
       loadStats();
-    }, [selectedPeriod]),
+    }, [loadStats]),
   );
 
-  // Chart labels based on period
-  const getChartLabels = () => {
-    if (selectedPeriod === 'week') {
-      return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    } else if (selectedPeriod === 'month') {
-      // Show every 5th day
-      return Array.from({ length: 30 }, (_, i) =>
-        i % 5 === 0 ? `${i + 1}` : '',
-      );
-    } else {
-      return [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-    }
-  };
-
-  // Data for the chart
-  const weeklyData = {
-    labels: getChartLabels(),
-    datasets: [
-      {
-        data: chartData.length > 0 ? chartData : [0],
-      },
-    ],
-  };
-
-  const chartConfig = {
-    backgroundColor: theme.colors.surface,
-    backgroundGradientFrom: theme.colors.surface,
-    backgroundGradientTo: theme.colors.surface,
-    decimalPlaces: 0,
-    color: (opacity = 1) => {
-      const primary = theme.colors.primary;
-      return `${primary}${Math.round(opacity * 255)
-        .toString(16)
-        .padStart(2, '0')}`;
+  const handleTimelineSummaryChange = useCallback(
+    (summary: TimelineSummary) => {
+      setSelectedPeriod(summary.period);
+      setCurrentTotal(summary.currentTotal);
+      setPreviousTotal(summary.previousTotal);
     },
-    labelColor: (opacity = 1) => theme.colors.onSurface,
-    strokeWidth: 3,
-    propsForBackgroundLines: {
-      stroke: 'transparent',
-    },
-    propsForLabels: {
-      fontSize: selectedPeriod === 'month' ? 10 : 11,
-      fontWeight: '400',
-    },
-    propsForDots: {
-      r: '5',
-      strokeWidth: '3',
-      stroke: theme.colors.primary,
-      fill: theme.colors.surface,
-    },
-  };
-
-  // Calculate average based on period
-  const getAverage = () => {
-    if (selectedPeriod === 'week') {
-      return currentTotal > 0 ? Math.round(currentTotal / 7) : 0;
-    } else if (selectedPeriod === 'month') {
-      return currentTotal > 0 ? Math.round(currentTotal / 30) : 0;
-    } else {
-      return currentTotal > 0 ? Math.round(currentTotal / 12) : 0;
-    }
-  };
-
-  const average = getAverage();
-
-  // Calculate percentage change
-  const percentageChange =
-    previousTotal > 0
-      ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
-      : 0;
-
-  // Get period label
-  const getPeriodLabel = () => {
-    return selectedPeriod === 'week'
-      ? 'day'
-      : selectedPeriod === 'month'
-        ? 'day'
-        : 'month';
-  };
+    [],
+  );
 
   const getComparisonLabel = () => {
     return selectedPeriod === 'week'
@@ -290,7 +167,7 @@ export default function StatsPage() {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={{
         paddingTop: insets.top + 16,
-        paddingBottom: 32,
+        paddingBottom: 120,
       }}
     >
       <Surface style={styles.content} elevation={0}>
@@ -304,135 +181,7 @@ export default function StatsPage() {
           </Text>
         </Surface>
 
-        {/* Period Selector */}
-        <Surface style={styles.periodSelector} elevation={0}>
-          <SegmentedButtons
-            value={selectedPeriod}
-            onValueChange={setSelectedPeriod}
-            buttons={[
-              { value: 'week', label: 'Week' },
-              { value: 'month', label: 'Month' },
-              { value: 'year', label: 'Year' },
-            ]}
-          />
-        </Surface>
-
-        {/* Chart */}
-        <Surface style={styles.chartContainer} elevation={0}>
-          <LineChart
-            data={weeklyData}
-            width={screenWidth + 16}
-            height={240}
-            chartConfig={chartConfig}
-            style={styles.chart}
-            bezier
-            withDots={true}
-            withShadow={false}
-            withInnerLines={false}
-            withOuterLines={false}
-            withVerticalLines={false}
-            withHorizontalLines={false}
-            withVerticalLabels={true}
-            withHorizontalLabels={true}
-            segments={4}
-            fromZero
-            yAxisSuffix=''
-            onDataPointClick={(data) => {
-              console.log(data);
-            }}
-          />
-        </Surface>
-
-        {/* Stats Cards Row */}
-        <Surface style={styles.statsRow} elevation={0}>
-          <Card style={styles.statCardHalf}>
-            <Card.Content>
-              <Text variant='bodyMedium' style={styles.statLabel}>
-                {selectedPeriod === 'week'
-                  ? 'Daily'
-                  : selectedPeriod === 'month'
-                    ? 'Daily'
-                    : 'Monthly'}{' '}
-                Average
-              </Text>
-              <Surface style={styles.statValueRow} elevation={0}>
-                <Text variant='headlineLarge' style={styles.statNumber}>
-                  {average}
-                </Text>
-                <Text variant='bodyMedium'>
-                  {' '}
-                  {average === 1 ? 'cigarette' : 'cigarettes'}
-                </Text>
-              </Surface>
-              {previousTotal > 0 && (
-                <Surface style={styles.changeRow} elevation={0}>
-                  <Icon
-                    source={
-                      percentageChange < 0 ? 'trending-down' : 'trending-up'
-                    }
-                    size={16}
-                    color={percentageChange < 0 ? '#4CAF50' : '#F44336'}
-                  />
-                  <Text
-                    variant='bodySmall'
-                    style={
-                      percentageChange < 0
-                        ? styles.changeTextGreen
-                        : styles.changeTextRed
-                    }
-                  >
-                    {percentageChange > 0 ? '+' : ''}
-                    {percentageChange}% vs {getComparisonLabel()}
-                  </Text>
-                </Surface>
-              )}
-            </Card.Content>
-          </Card>
-
-          <Card style={styles.statCardHalf}>
-            <Card.Content>
-              <Text variant='bodyMedium' style={styles.statLabel}>
-                Total This{' '}
-                {selectedPeriod === 'week'
-                  ? 'Week'
-                  : selectedPeriod === 'month'
-                    ? 'Month'
-                    : 'Year'}
-              </Text>
-              <Surface style={styles.statValueRow} elevation={0}>
-                <Text variant='headlineLarge' style={styles.statNumber}>
-                  {currentTotal}
-                </Text>
-                <Text variant='bodyMedium'>
-                  {' '}
-                  {currentTotal === 1 ? 'cigarette' : 'cigarettes'}
-                </Text>
-              </Surface>
-              {previousTotal > 0 && (
-                <Surface style={styles.changeRow} elevation={0}>
-                  <Icon
-                    source={
-                      percentageChange < 0 ? 'trending-down' : 'trending-up'
-                    }
-                    size={16}
-                    color={percentageChange < 0 ? '#4CAF50' : '#F44336'}
-                  />
-                  <Text
-                    variant='bodySmall'
-                    style={
-                      percentageChange < 0
-                        ? styles.changeTextGreen
-                        : styles.changeTextRed
-                    }
-                  >
-                    {percentageChange > 0 ? '+' : ''}
-                    {percentageChange}% vs {getComparisonLabel()}
-                  </Text>
-                </Surface>
-              )}
-            </Card.Content>
-          </Card>
-        </Surface>
+        <StatsTimelineChart onSummaryChange={handleTimelineSummaryChange} />
 
         {/* Top Triggers - Only for week view */}
         {selectedPeriod === 'week' && topTriggers.length > 0 && (
@@ -628,56 +377,6 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     opacity: 0.7,
-  },
-  periodSelector: {
-    marginBottom: 20,
-    backgroundColor: 'transparent',
-  },
-  chartContainer: {
-    marginBottom: 24,
-    marginHorizontal: -16,
-    borderRadius: 0,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-  },
-  chart: {
-    marginLeft: -16,
-    marginRight: -16,
-    borderRadius: 0,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-    backgroundColor: 'transparent',
-  },
-  statCardHalf: {
-    flex: 1,
-  },
-  statLabel: {
-    marginBottom: 8,
-    opacity: 0.7,
-  },
-  statValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-  },
-  statNumber: {
-    fontWeight: 'bold',
-  },
-  changeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'transparent',
-  },
-  changeTextGreen: {
-    color: '#4CAF50',
-  },
-  changeTextRed: {
-    color: '#F44336',
   },
   section: {
     marginBottom: 24,
