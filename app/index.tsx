@@ -34,6 +34,39 @@ export default function SubscriptionPage() {
     useState<PurchasesPackage | null>(null);
   const [checking, setChecking] = useState(true);
 
+  const checkSubscription = useCallback(async () => {
+    try {
+      const customerInfo = await PurchaseService.getCustomerInfo();
+      console.log('Customer Info:', JSON.stringify(customerInfo, null, 2));
+      setChecking(false);
+      if (
+        customerInfo &&
+        typeof customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !==
+          'undefined'
+      ) {
+        router.replace('/(tabs)/home');
+      }
+    } catch {
+      setChecking(false);
+      // Error fetching customer info
+      Alert.alert('Error', 'Failed to fetch customer information.');
+    }
+  }, []);
+
+  const loadOfferings = useCallback(async () => {
+    try {
+      const offering = await PurchaseService.getOfferings();
+      if (offering && offering.availablePackages.length > 0) {
+        // Get monthly package or first available package
+        const monthlyPackage =
+          offering.monthly || offering.availablePackages[0];
+        setSubscriptionPackage(monthlyPackage);
+      }
+    } catch (error) {
+      console.error('Error loading offerings:', error);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       if (PAYWALL_BYPASS) {
@@ -55,40 +88,7 @@ export default function SubscriptionPage() {
       checkSubscription();
       loadOfferings();
     })();
-  }, []);
-
-  const checkSubscription = async () => {
-    try {
-      const customerInfo = await PurchaseService.getCustomerInfo();
-      console.log('Customer Info:', JSON.stringify(customerInfo, null, 2));
-      setChecking(false);
-      if (
-        customerInfo &&
-        typeof customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !==
-          'undefined'
-      ) {
-        router.replace('/(tabs)/home');
-      }
-    } catch {
-      setChecking(false);
-      // Error fetching customer info
-      Alert.alert('Error', 'Failed to fetch customer information.');
-    }
-  };
-
-  const loadOfferings = async () => {
-    try {
-      const offering = await PurchaseService.getOfferings();
-      if (offering && offering.availablePackages.length > 0) {
-        // Get monthly package or first available package
-        const monthlyPackage =
-          offering.monthly || offering.availablePackages[0];
-        setSubscriptionPackage(monthlyPackage);
-      }
-    } catch (error) {
-      console.error('Error loading offerings:', error);
-    }
-  };
+  }, [checkSubscription, loadOfferings]);
 
   const priceString = useCallback(() => {
     if (!subscriptionPackage) return '';
@@ -123,7 +123,7 @@ export default function SubscriptionPage() {
           'Something went wrong. Please try again.',
         );
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);

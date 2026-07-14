@@ -19,10 +19,9 @@ const Settings = () => {
   let version = '1.0.0';
   try {
     // relative to this file: app/(tabs)/settings.tsx -> ../../package.json
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const pkg = require('../../package.json');
     version = pkg?.version || version;
-  } catch (e) {
+  } catch {
     // ignore
   }
 
