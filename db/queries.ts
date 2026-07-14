@@ -1,6 +1,103 @@
 import { eq } from 'drizzle-orm';
-import { db } from './client';
+import { db, expoDb } from './client';
 import { smokingLog, smokingLogTriggers, userSmokingSettings } from './schema';
+
+const MIN_VALID_TIMESTAMP_MS = new Date('2000-01-01T00:00:00.000Z').getTime();
+
+const TIMESTAMP_MS_SQL = `
+  CASE
+    WHEN typeof(timestamp) IN ('integer', 'real') THEN CAST(timestamp AS INTEGER)
+    WHEN CAST(timestamp AS INTEGER) >= ${MIN_VALID_TIMESTAMP_MS} THEN CAST(timestamp AS INTEGER)
+    ELSE CAST(strftime('%s', timestamp, 'utc') AS INTEGER) * 1000
+  END
+`;
+
+const VALID_TIMESTAMP_SQL = `
+  ${TIMESTAMP_MS_SQL} IS NOT NULL
+  AND ${TIMESTAMP_MS_SQL} >= ${MIN_VALID_TIMESTAMP_MS}
+`;
+
+const TIMESTAMP_SECONDS_SQL = `(${TIMESTAMP_MS_SQL}) / 1000`;
+const LOG_TIMESTAMP_MS_SQL = TIMESTAMP_MS_SQL.replace(/timestamp/g, 'l.timestamp');
+const VALID_LOG_TIMESTAMP_SQL = VALID_TIMESTAMP_SQL.replace(
+  /timestamp/g,
+  'l.timestamp',
+);
+
+type CountRow = { count: number };
+type BucketCountRow = { bucket: number; count: number };
+type TriggerCountRow = { trigger: string; count: number };
+type SmokingLogTimestampRow = { id: number; timestamp: number | string };
+type SmokedDayRow = { day: string };
+
+function toTimestampMs(date: string | Date) {
+  const timestamp =
+    date instanceof Date ? date.getTime() : new Date(date).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function formatLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+async function countSmokingLogsBetween(
+  startDate: string | Date,
+  endDate: string | Date,
+) {
+  const startMs = toTimestampMs(startDate);
+  const endMs = toTimestampMs(endDate);
+
+  if (startMs === null || endMs === null) {
+    return 0;
+  }
+
+  const row = await expoDb.getFirstAsync<CountRow>(
+    `
+      SELECT COUNT(*) as count
+      FROM smoking_log
+      WHERE ${VALID_TIMESTAMP_SQL}
+        AND ${TIMESTAMP_MS_SQL} BETWEEN ? AND ?
+    `,
+    [startMs, endMs],
+  );
+
+  return row?.count ?? 0;
+}
+
+async function getBucketCounts(
+  bucketSql: string,
+  startDate: Date,
+  endDate: Date,
+) {
+  const rows = await expoDb.getAllAsync<BucketCountRow>(
+    `
+      SELECT ${bucketSql} as bucket, COUNT(*) as count
+      FROM smoking_log
+      WHERE ${VALID_TIMESTAMP_SQL}
+        AND ${TIMESTAMP_MS_SQL} BETWEEN ? AND ?
+      GROUP BY bucket
+    `,
+    [startDate.getTime(), endDate.getTime()],
+  );
+
+  return rows;
+}
+
+function fillCounts(size: number, rows: BucketCountRow[]) {
+  const counts = new Array(size).fill(0);
+
+  rows.forEach((row) => {
+    if (row.bucket >= 0 && row.bucket < size) {
+      counts[row.bucket] = row.count;
+    }
+  });
+
+  return counts;
+}
 
 // Insert a smoking log entry
 export async function logSmokingEvent(triggers: string[] = []) {
@@ -94,15 +191,7 @@ export async function getSmokingCountByDateRange(
   endDate: string,
 ) {
   try {
-    const logs = db.select().from(smokingLog).all();
-
-    // Filter in JavaScript since expo-sqlite doesn't support complex where clauses well
-    const filtered = logs.filter((log) => {
-      const logDate = new Date(log.timestamp);
-      return logDate >= new Date(startDate) && logDate <= new Date(endDate);
-    });
-
-    return filtered.length;
+    return await countSmokingLogsBetween(startDate, endDate);
   } catch (error) {
     console.error('Error fetching smoking count:', error);
     return 0;
@@ -176,20 +265,13 @@ export async function getWeeklyBreakdown() {
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    const logs = db.select().from(smokingLog).all();
+    const rows = await getBucketCounts(
+      `CAST(strftime('%w', ${TIMESTAMP_SECONDS_SQL}, 'unixepoch', 'localtime') AS INTEGER)`,
+      startOfWeek,
+      endOfWeek,
+    );
 
-    // Initialize counts for each day
-    const dayCounts = [0, 0, 0, 0, 0, 0, 0]; // Sun to Sat
-
-    logs.forEach((log) => {
-      const logDate = new Date(log.timestamp);
-      if (logDate >= startOfWeek && logDate <= endOfWeek) {
-        const dayIndex = logDate.getDay();
-        dayCounts[dayIndex]++;
-      }
-    });
-
-    return dayCounts;
+    return fillCounts(7, rows);
   } catch (error) {
     console.error('Error fetching weekly breakdown:', error);
     return [0, 0, 0, 0, 0, 0, 0];
@@ -200,17 +282,19 @@ export async function getWeeklyBreakdown() {
 export async function getTodayLogs() {
   try {
     const today = new Date();
-    const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-    const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
-    const logs = db.select().from(smokingLog).all();
-
-    const todayLogs = logs.filter((log) => {
-      const logDate = new Date(log.timestamp);
-      return logDate >= new Date(startOfDay) && logDate <= new Date(endOfDay);
-    });
-
-    return todayLogs;
+    return await expoDb.getAllAsync<SmokingLogTimestampRow>(
+      `
+        SELECT id, timestamp
+        FROM smoking_log
+        WHERE ${VALID_TIMESTAMP_SQL}
+          AND ${TIMESTAMP_MS_SQL} BETWEEN ? AND ?
+        ORDER BY ${TIMESTAMP_MS_SQL} ASC, id ASC
+      `,
+      [startOfDay.getTime(), endOfDay.getTime()],
+    );
   } catch (error) {
     console.error("Error fetching today's logs:", error);
     return [];
@@ -266,8 +350,7 @@ export async function getDetailedWeeklyBreakdown() {
     startOfWeek.setDate(today.getDate() - today.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const logs = db.select().from(smokingLog).all();
-
+    const dayCounts = await getWeeklyBreakdown();
     const breakdown = [];
     const dayNames = [
       'Sunday',
@@ -283,16 +366,7 @@ export async function getDetailedWeeklyBreakdown() {
       const currentDay = new Date(startOfWeek);
       currentDay.setDate(startOfWeek.getDate() + i);
 
-      const dayStart = new Date(currentDay);
-      dayStart.setHours(0, 0, 0, 0);
-
-      const dayEnd = new Date(currentDay);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      const dayLogs = logs.filter((log) => {
-        const logDate = new Date(log.timestamp);
-        return logDate >= dayStart && logDate <= dayEnd;
-      });
+      const count = dayCounts[currentDay.getDay()] ?? 0;
 
       breakdown.push({
         day: dayNames[currentDay.getDay()],
@@ -300,8 +374,8 @@ export async function getDetailedWeeklyBreakdown() {
           month: 'short',
           day: 'numeric',
         }),
-        count: dayLogs.length,
-        progress: dayLogs.length / 20, // Assume max 20 per day
+        count,
+        progress: count / 20, // Assume max 20 per day
       });
     }
 
@@ -327,19 +401,14 @@ export async function getMonthlyBreakdown() {
       999,
     );
 
-    const logs = db.select().from(smokingLog).all();
+    const dayOfMonthSql = `CAST(strftime('%d', ${TIMESTAMP_SECONDS_SQL}, 'unixepoch', 'localtime') AS INTEGER)`;
+    const rows = await getBucketCounts(
+      `MIN(CAST((${dayOfMonthSql} - 1) / 7 AS INTEGER), 3)`,
+      startOfMonth,
+      endOfMonth,
+    );
 
-    const weekCounts = new Array(4).fill(0);
-
-    logs.forEach((log) => {
-      const logDate = new Date(log.timestamp);
-      if (logDate >= startOfMonth && logDate <= endOfMonth) {
-        const weekIndex = Math.min(Math.floor((logDate.getDate() - 1) / 7), 3);
-        weekCounts[weekIndex]++;
-      }
-    });
-
-    return weekCounts;
+    return fillCounts(4, rows);
   } catch (error) {
     console.error('Error fetching monthly breakdown:', error);
     return new Array(4).fill(0);
@@ -352,18 +421,14 @@ export async function getYearlyBreakdown() {
     const today = new Date();
     const startOfYear = new Date(today.getFullYear(), 0, 1);
     const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
-    const logs = db.select().from(smokingLog).all();
 
-    const monthCounts = new Array(12).fill(0);
+    const rows = await getBucketCounts(
+      `CAST(strftime('%m', ${TIMESTAMP_SECONDS_SQL}, 'unixepoch', 'localtime') AS INTEGER) - 1`,
+      startOfYear,
+      endOfYear,
+    );
 
-    logs.forEach((log) => {
-      const logDate = new Date(log.timestamp);
-      if (logDate >= startOfYear && logDate <= endOfYear) {
-        monthCounts[logDate.getMonth()]++;
-      }
-    });
-
-    return monthCounts;
+    return fillCounts(12, rows);
   } catch (error) {
     console.error('Error fetching yearly breakdown:', error);
     return new Array(12).fill(0);
@@ -416,33 +481,21 @@ export async function getTopTrigger() {
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
 
-    const logs = db.select().from(smokingLog).all();
-    const triggers = db.select().from(smokingLogTriggers).all();
+    const topTrigger = await expoDb.getFirstAsync<TriggerCountRow>(
+      `
+        SELECT t.trigger, COUNT(*) as count
+        FROM smoking_log_triggers t
+        INNER JOIN smoking_log l ON l.id = t.log_id
+        WHERE ${VALID_LOG_TIMESTAMP_SQL}
+          AND ${LOG_TIMESTAMP_MS_SQL} >= ?
+        GROUP BY t.trigger
+        ORDER BY count DESC, t.trigger ASC
+        LIMIT 1
+      `,
+      [sevenDaysAgo.getTime()],
+    );
 
-    // Filter logs from last 7 days
-    const recentLogIds = logs
-      .filter((log) => new Date(log.timestamp) >= sevenDaysAgo)
-      .map((log) => log.id);
-
-    // Count triggers
-    const triggerCounts: { [key: string]: number } = {};
-    triggers.forEach((t) => {
-      if (recentLogIds.includes(t.logId)) {
-        triggerCounts[t.trigger] = (triggerCounts[t.trigger] || 0) + 1;
-      }
-    });
-
-    // Find top trigger
-    let topTrigger = null;
-    let maxCount = 0;
-    Object.entries(triggerCounts).forEach(([trigger, count]) => {
-      if (count > maxCount) {
-        maxCount = count;
-        topTrigger = trigger;
-      }
-    });
-
-    return topTrigger;
+    return topTrigger?.trigger ?? null;
   } catch (error) {
     console.error('Error fetching top trigger:', error);
     return null;
@@ -456,29 +509,19 @@ export async function getTop5Triggers() {
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
 
-    const logs = db.select().from(smokingLog).all();
-    const triggers = db.select().from(smokingLogTriggers).all();
-
-    // Filter logs from last 7 days
-    const recentLogIds = logs
-      .filter((log) => new Date(log.timestamp) >= sevenDaysAgo)
-      .map((log) => log.id);
-
-    // Count triggers
-    const triggerCounts: { [key: string]: number } = {};
-    triggers.forEach((t) => {
-      if (recentLogIds.includes(t.logId)) {
-        triggerCounts[t.trigger] = (triggerCounts[t.trigger] || 0) + 1;
-      }
-    });
-
-    // Convert to array and sort by count
-    const sortedTriggers = Object.entries(triggerCounts)
-      .map(([trigger, count]) => ({ trigger, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-
-    return sortedTriggers;
+    return await expoDb.getAllAsync<TriggerCountRow>(
+      `
+        SELECT t.trigger, COUNT(*) as count
+        FROM smoking_log_triggers t
+        INNER JOIN smoking_log l ON l.id = t.log_id
+        WHERE ${VALID_LOG_TIMESTAMP_SQL}
+          AND ${LOG_TIMESTAMP_MS_SQL} >= ?
+        GROUP BY t.trigger
+        ORDER BY count DESC, t.trigger ASC
+        LIMIT 5
+      `,
+      [sevenDaysAgo.getTime()],
+    );
   } catch (error) {
     console.error('Error fetching top 5 triggers:', error);
     return [];
@@ -488,35 +531,33 @@ export async function getTop5Triggers() {
 // Calculate consecutive non-smoking days streak
 export async function getNonSmokingStreak() {
   try {
-    const logs = db.select().from(smokingLog).all();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Filter out logs with invalid or ancient timestamps (bad data)
-    const validLogs = (logs || []).filter((log) => {
-      const d = new Date(log.timestamp);
-      if (isNaN(d.getTime())) return false;
-      // ignore anything before year 2000 as invalid/ancient
-      return d.getFullYear() >= 2000;
-    });
+    const rows = await expoDb.getAllAsync<SmokedDayRow>(
+      `
+        SELECT DISTINCT strftime(
+          '%Y-%m-%d',
+          ${TIMESTAMP_SECONDS_SQL},
+          'unixepoch',
+          'localtime'
+        ) as day
+        FROM smoking_log
+        WHERE ${VALID_TIMESTAMP_SQL}
+        ORDER BY day ASC
+      `,
+    );
 
     // If there are no valid logs yet, user hasn't started tracking
-    if (!validLogs || validLogs.length === 0) {
+    if (!rows || rows.length === 0) {
       return 0;
     }
 
-    // Check if user smoked today
-    const todayStart = new Date(today);
-    const todayEnd = new Date(today);
-    todayEnd.setHours(23, 59, 59, 999);
-
-    const smokedToday = validLogs.some((log) => {
-      const logDate = new Date(log.timestamp);
-      return logDate >= todayStart && logDate <= todayEnd;
-    });
+    const smokedDays = new Set(rows.map((row) => row.day));
+    const todayKey = formatLocalDateKey(today);
 
     // If smoked today, streak is 0
-    if (smokedToday) {
+    if (smokedDays.has(todayKey)) {
       return 0;
     }
 
@@ -526,27 +567,15 @@ export async function getNonSmokingStreak() {
     checkDate.setDate(checkDate.getDate() - 1); // Start from yesterday
 
     // Determine earliest valid log date so we don't count before tracking began
-    const earliestLogDate = new Date(
-      Math.min(...validLogs.map((l) => new Date(l.timestamp).getTime())),
-    );
-    earliestLogDate.setHours(0, 0, 0, 0);
+    const earliestLogDay = rows[0].day;
 
     while (true) {
+      const checkDay = formatLocalDateKey(checkDate);
+
       // If we've gone before the earliest log, stop counting — user hadn't started
-      if (checkDate < earliestLogDate) break;
+      if (checkDay < earliestLogDay) break;
 
-      const dayStart = new Date(checkDate);
-      dayStart.setHours(0, 0, 0, 0);
-
-      const dayEnd = new Date(checkDate);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      const smokedOnDay = validLogs.some((log) => {
-        const logDate = new Date(log.timestamp);
-        return logDate >= dayStart && logDate <= dayEnd;
-      });
-
-      if (smokedOnDay) {
+      if (smokedDays.has(checkDay)) {
         break; // Found a day with smoking, stop counting
       }
 

@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/expo-sqlite';
 import { openDatabaseSync } from 'expo-sqlite';
 import * as schema from './schema';
 
-const expoDb = openDatabaseSync('quitSmoking.db');
+export const expoDb = openDatabaseSync('quitSmoking.db');
 
 export const db = drizzle(expoDb, { schema });
 
@@ -36,6 +36,33 @@ export async function initializeDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    try {
+      await expoDb.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_smoking_log_timestamp
+        ON smoking_log(timestamp);
+
+        CREATE INDEX IF NOT EXISTS idx_smoking_log_triggers_log_id
+        ON smoking_log_triggers(log_id);
+      `);
+    } catch (indexError) {
+      console.warn('Database indexes could not be created:', indexError);
+    }
+
+    try {
+      await expoDb.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_smoking_log_timestamp_ms
+        ON smoking_log(
+          CASE
+            WHEN typeof(timestamp) IN ('integer', 'real') THEN CAST(timestamp AS INTEGER)
+            WHEN CAST(timestamp AS INTEGER) >= 946684800000 THEN CAST(timestamp AS INTEGER)
+            ELSE CAST(strftime('%s', timestamp, 'utc') AS INTEGER) * 1000
+          END
+        );
+      `);
+    } catch (indexError) {
+      console.warn('Normalized timestamp index could not be created:', indexError);
+    }
 
     console.log('Database initialized successfully');
     return true;
