@@ -6,9 +6,9 @@ import {
 } from "@expo-google-fonts/roboto";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect, useState } from "react";
-import { useColorScheme } from "react-native";
-import { PaperProvider } from "react-native-paper";
+import { useCallback, useEffect, useState } from "react";
+import { StyleSheet, useColorScheme, View } from "react-native";
+import { Button, Icon, PaperProvider, Text } from "react-native-paper";
 import { initializeDatabase } from "../db/client";
 import PurchaseService from "../services/purchases";
 import { darkTheme, lightTheme } from "./theme";
@@ -16,12 +16,15 @@ import { darkTheme, lightTheme } from "./theme";
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
+type DatabaseStatus = "loading" | "ready" | "failed";
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [theme, setTheme] = useState(
     colorScheme === "dark" ? darkTheme : lightTheme
   );
-  const [dbInitialized, setDbInitialized] = useState(false);
+  const [databaseStatus, setDatabaseStatus] =
+    useState<DatabaseStatus>("loading");
   const [purchasesInitialized, setPurchasesInitialized] = useState(false);
 
   const [fontsLoaded] = useFonts({
@@ -30,13 +33,28 @@ export default function RootLayout() {
     Roboto_700Bold,
   });
 
-  useEffect(() => {
-    async function setupDatabase() {
+  const setupDatabase = useCallback(async () => {
+    setDatabaseStatus("loading");
+
+    try {
       const success = await initializeDatabase();
-      setDbInitialized(success);
+
+      if (success) {
+        setDatabaseStatus("ready");
+        return;
+      }
+
+      console.error("Database initialization returned false.");
+      setDatabaseStatus("failed");
+    } catch (error) {
+      console.error("Unexpected database initialization error:", error);
+      setDatabaseStatus("failed");
     }
-    setupDatabase();
   }, []);
+
+  useEffect(() => {
+    setupDatabase();
+  }, [setupDatabase]);
 
   useEffect(() => {
     async function setupPurchases() {
@@ -53,17 +71,73 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded && dbInitialized && purchasesInitialized) {
+    if (
+      fontsLoaded &&
+      databaseStatus !== "loading" &&
+      purchasesInitialized
+    ) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, dbInitialized, purchasesInitialized]);
+  }, [databaseStatus, fontsLoaded, purchasesInitialized]);
 
   useEffect(() => {
     setTheme(colorScheme === "dark" ? darkTheme : lightTheme);
   }, [colorScheme]);
 
-  if (!fontsLoaded || !dbInitialized || !purchasesInitialized) {
+  if (!fontsLoaded || databaseStatus === "loading" || !purchasesInitialized) {
     return null;
+  }
+
+  if (databaseStatus === "failed") {
+    return (
+      <PaperProvider theme={theme}>
+        <View
+          style={[
+            styles.errorContainer,
+            { backgroundColor: theme.colors.background },
+          ]}
+        >
+          <Icon
+            source="database-alert"
+            size={48}
+            color={theme.colors.error}
+          />
+          <Text
+            variant="headlineSmall"
+            style={[styles.errorTitle, { color: theme.colors.onBackground }]}
+          >
+            We couldn&apos;t start the app
+          </Text>
+          <Text
+            variant="bodyMedium"
+            style={[
+              styles.errorMessage,
+              { color: theme.colors.onSurfaceVariant },
+            ]}
+          >
+            Your data is safe, but the app could not open its local database.
+            Please try again.
+          </Text>
+          <Button
+            mode="contained"
+            icon="refresh"
+            onPress={setupDatabase}
+            style={styles.retryButton}
+          >
+            Try again
+          </Button>
+          <Text
+            variant="bodySmall"
+            style={[
+              styles.recoveryText,
+              { color: theme.colors.onSurfaceVariant },
+            ]}
+          >
+            If this keeps happening, close and reopen the app.
+          </Text>
+        </View>
+      </PaperProvider>
+    );
   }
 
   return (
@@ -75,3 +149,29 @@ export default function RootLayout() {
     </PaperProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  errorTitle: {
+    marginTop: 20,
+    textAlign: "center",
+  },
+  errorMessage: {
+    marginTop: 12,
+    maxWidth: 360,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 24,
+  },
+  recoveryText: {
+    marginTop: 16,
+    maxWidth: 320,
+    textAlign: "center",
+  },
+});
