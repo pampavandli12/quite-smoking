@@ -65,7 +65,7 @@ export default function SmokingSetupScreen() {
     >
       {/* Main Heading */}
       <Text variant='headlineMedium' style={{ marginTop: 16 }}>
-        Let's set your baseline
+        Let&apos;s set your baseline
       </Text>
 
       {/* Description */}
