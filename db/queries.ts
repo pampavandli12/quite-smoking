@@ -1,6 +1,4 @@
-import { eq } from 'drizzle-orm';
-import { db, expoDb } from './client';
-import { smokingLog, smokingLogTriggers, userSmokingSettings } from './schema';
+import { dbGetAllAsync, dbGetFirstAsync, dbRunAsync } from './client';
 
 const MIN_VALID_TIMESTAMP_MS = new Date('2000-01-01T00:00:00.000Z').getTime();
 
@@ -28,7 +26,20 @@ type CountRow = { count: number };
 type BucketCountRow = { bucket: number; count: number };
 type TriggerCountRow = { trigger: string; count: number };
 type SmokingLogTimestampRow = { id: number; timestamp: number | string };
+type SmokingLogRow = { id: number; timestamp: number | string };
+type SmokingLogWithTriggerRow = {
+  id: number;
+  timestamp: number | string;
+  triggerId: number | null;
+  trigger: string | null;
+};
 type SmokedDayRow = { day: string };
+type SmokingSettingsRow = {
+  id: number;
+  cigarettesPerDay: number;
+  costPerCigaretteCents: number;
+  createdAt: number | string;
+};
 
 function toTimestampMs(date: string | Date) {
   const timestamp =
@@ -55,7 +66,7 @@ async function countSmokingLogsBetween(
     return 0;
   }
 
-  const row = await expoDb.getFirstAsync<CountRow>(
+  const row = await dbGetFirstAsync<CountRow>(
     `
       SELECT COUNT(*) as count
       FROM smoking_log
@@ -73,7 +84,7 @@ async function getBucketCounts(
   startDate: Date,
   endDate: Date,
 ) {
-  const rows = await expoDb.getAllAsync<BucketCountRow>(
+  const rows = await dbGetAllAsync<BucketCountRow>(
     `
       SELECT ${bucketSql} as bucket, COUNT(*) as count
       FROM smoking_log
@@ -102,18 +113,34 @@ function fillCounts(size: number, rows: BucketCountRow[]) {
 // Insert a smoking log entry
 export async function logSmokingEvent(triggers: string[] = []) {
   try {
+    const timestamp = Date.now();
+
     // Insert into smoking_log
-    const result = await db.insert(smokingLog).values({}).returning();
-    const logId = result[0].id;
+    const result = await dbGetFirstAsync<{ id: number }>(
+      `
+        INSERT INTO smoking_log (timestamp)
+        VALUES (?)
+        RETURNING id
+      `,
+      [timestamp],
+    );
+    const logId = result?.id;
+
+    if (!logId) {
+      throw new Error('Smoking log insert did not return an id.');
+    }
 
     // Insert triggers if provided
     if (triggers.length > 0) {
-      await db.insert(smokingLogTriggers).values(
-        triggers.map((trigger) => ({
-          logId,
-          trigger,
-        })),
-      );
+      for (const trigger of triggers) {
+        await dbRunAsync(
+          `
+            INSERT INTO smoking_log_triggers (log_id, trigger)
+            VALUES (?, ?)
+          `,
+          [logId, trigger],
+        );
+      }
     }
 
     return { success: true, logId };
@@ -126,7 +153,13 @@ export async function logSmokingEvent(triggers: string[] = []) {
 // Get all smoking logs
 export async function getAllSmokingLogs() {
   try {
-    const logs = db.select().from(smokingLog).all();
+    const logs = await dbGetAllAsync<SmokingLogRow>(
+      `
+        SELECT id, timestamp
+        FROM smoking_log
+        ORDER BY timestamp DESC, id DESC
+      `,
+    );
 
     // Filter out logs with invalid or ancient timestamps (bad data)
     const validLogs = (logs || []).filter((log) => {
@@ -150,16 +183,18 @@ export async function getAllSmokingLogs() {
 // Get smoking logs with triggers
 export async function getSmokingLogsWithTriggers() {
   try {
-    const logs = db
-      .select({
-        id: smokingLog.id,
-        timestamp: smokingLog.timestamp,
-        triggerId: smokingLogTriggers.id,
-        trigger: smokingLogTriggers.trigger,
-      })
-      .from(smokingLog)
-      .leftJoin(smokingLogTriggers, eq(smokingLog.id, smokingLogTriggers.logId))
-      .all();
+    const logs = await dbGetAllAsync<SmokingLogWithTriggerRow>(
+      `
+        SELECT
+          l.id,
+          l.timestamp,
+          t.id as triggerId,
+          t.trigger
+        FROM smoking_log l
+        LEFT JOIN smoking_log_triggers t ON l.id = t.log_id
+        ORDER BY l.timestamp DESC, l.id DESC, t.id ASC
+      `,
+    );
 
     // Group by log id
     const groupedLogs = logs.reduce((acc: any[], log: any) => {
@@ -202,12 +237,22 @@ export async function getSmokingCountByDateRange(
 export async function deleteSmokingLog(logId: number) {
   try {
     // Delete triggers first (foreign key constraint)
-    await db
-      .delete(smokingLogTriggers)
-      .where(eq(smokingLogTriggers.logId, logId));
+    await dbRunAsync(
+      `
+        DELETE FROM smoking_log_triggers
+        WHERE log_id = ?
+      `,
+      [logId],
+    );
 
     // Delete the log
-    await db.delete(smokingLog).where(eq(smokingLog.id, logId));
+    await dbRunAsync(
+      `
+        DELETE FROM smoking_log
+        WHERE id = ?
+      `,
+      [logId],
+    );
 
     return { success: true };
   } catch (error) {
@@ -285,7 +330,7 @@ export async function getTodayLogs() {
     const startOfDay = new Date(today.setHours(0, 0, 0, 0));
     const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
-    return await expoDb.getAllAsync<SmokingLogTimestampRow>(
+    return await dbGetAllAsync<SmokingLogTimestampRow>(
       `
         SELECT id, timestamp
         FROM smoking_log
@@ -438,18 +483,18 @@ export async function getYearlyBreakdown() {
 // --- User smoking settings (cigarettes per day & cost) ---
 export async function getSmokingSettings() {
   try {
-    const rows = db.select().from(userSmokingSettings).all();
-    if (!rows || rows.length === 0) return null;
-
-    // Return the most recent settings (by createdAt)
-    const sorted = rows.sort((a: any, b: any) => b.createdAt - a.createdAt);
-    const s = sorted[0];
-    return {
-      id: s.id,
-      cigarettesPerDay: s.cigarettesPerDay,
-      costPerCigaretteCents: s.costPerCigaretteCents,
-      createdAt: s.createdAt,
-    };
+    return await dbGetFirstAsync<SmokingSettingsRow>(
+      `
+        SELECT
+          id,
+          cigarettes_per_day as cigarettesPerDay,
+          cost_per_cigarette_cents as costPerCigaretteCents,
+          created_at as createdAt
+        FROM user_smoking_settings
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `,
+    );
   } catch (error) {
     console.error('Error fetching smoking settings:', error);
     return null;
@@ -462,10 +507,24 @@ export async function setSmokingSettings(
 ) {
   try {
     const cents = Math.round(costPerCigarette * 100);
-    const result = await db
-      .insert(userSmokingSettings)
-      .values({ cigarettesPerDay, costPerCigaretteCents: cents })
-      .returning();
+    const createdAt = Date.now();
+    const row = await dbGetFirstAsync<SmokingSettingsRow>(
+      `
+        INSERT INTO user_smoking_settings (
+          cigarettes_per_day,
+          cost_per_cigarette_cents,
+          created_at
+        )
+        VALUES (?, ?, ?)
+        RETURNING
+          id,
+          cigarettes_per_day as cigarettesPerDay,
+          cost_per_cigarette_cents as costPerCigaretteCents,
+          created_at as createdAt
+      `,
+      [cigarettesPerDay, cents, createdAt],
+    );
+    const result = row ? [row] : [];
 
     return { success: true, result };
   } catch (error) {
@@ -481,7 +540,7 @@ export async function getTopTrigger() {
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
 
-    const topTrigger = await expoDb.getFirstAsync<TriggerCountRow>(
+    const topTrigger = await dbGetFirstAsync<TriggerCountRow>(
       `
         SELECT t.trigger, COUNT(*) as count
         FROM smoking_log_triggers t
@@ -509,7 +568,7 @@ export async function getTop5Triggers() {
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
 
-    return await expoDb.getAllAsync<TriggerCountRow>(
+    return await dbGetAllAsync<TriggerCountRow>(
       `
         SELECT t.trigger, COUNT(*) as count
         FROM smoking_log_triggers t
@@ -534,7 +593,7 @@ export async function getNonSmokingStreak() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const rows = await expoDb.getAllAsync<SmokedDayRow>(
+    const rows = await dbGetAllAsync<SmokedDayRow>(
       `
         SELECT DISTINCT strftime(
           '%Y-%m-%d',
