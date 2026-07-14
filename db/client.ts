@@ -61,13 +61,19 @@ export async function initializeDatabase() {
         );
       `);
     } catch (indexError) {
-      console.warn('Normalized timestamp index could not be created:', indexError);
+      console.warn(
+        'Normalized timestamp index could not be created:',
+        indexError,
+      );
     }
 
     console.log('Database initialized successfully');
     return true;
   } catch (error) {
-    console.error('Error initializing database:', error);
+    console.error(
+      'Database initialization failed while preparing quitSmoking.db:',
+      error,
+    );
     return false;
   }
 }
