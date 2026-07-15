@@ -4,6 +4,8 @@ import {
   getTop5Triggers,
   getTopTrigger,
   getYesterdayStats,
+  type DetailedWeeklyBreakdownItem,
+  type TriggerCountRow,
 } from '@/db';
 import StatsTimelineChart, {
   type StatsPeriod,
@@ -66,17 +68,29 @@ function getFallbackMessage() {
   return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
 }
 
+function getComparisonLabel(period: StatsPeriod) {
+  return period === 'week'
+    ? 'last week'
+    : period === 'month'
+      ? 'last month'
+      : 'last year';
+}
+
+function getCurrentPeriodLabel(period: StatsPeriod) {
+  return period === 'week' ? 'week' : period === 'month' ? 'month' : 'year';
+}
+
 export default function StatsPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [selectedPeriod, setSelectedPeriod] = useState<StatsPeriod>('week');
   const [currentTotal, setCurrentTotal] = useState(0);
   const [previousTotal, setPreviousTotal] = useState(0);
-  const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
-  const [healthInsight, setHealthInsight] = useState('');
-  const [topTriggers, setTopTriggers] = useState<
-    { trigger: string; count: number }[]
+  const [dailyBreakdown, setDailyBreakdown] = useState<
+    DetailedWeeklyBreakdownItem[]
   >([]);
+  const [healthInsight, setHealthInsight] = useState('');
+  const [topTriggers, setTopTriggers] = useState<TriggerCountRow[]>([]);
   const percentageChange =
     previousTotal > 0
       ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
@@ -154,13 +168,8 @@ export default function StatsPage() {
     [],
   );
 
-  const getComparisonLabel = () => {
-    return selectedPeriod === 'week'
-      ? 'last week'
-      : selectedPeriod === 'month'
-        ? 'last month'
-        : 'last year';
-  };
+  const comparisonLabel = getComparisonLabel(selectedPeriod);
+  const currentPeriodLabel = getCurrentPeriodLabel(selectedPeriod);
 
   return (
     <ScrollView
@@ -300,7 +309,7 @@ export default function StatsPage() {
                 <Text variant='bodyLarge' style={styles.goalDescription}>
                   {Math.abs(percentageChange)}%{' '}
                   {percentageChange < 0 ? 'less' : 'more'} than{' '}
-                  {getComparisonLabel()}
+                  {comparisonLabel}
                 </Text>
                 <Text
                   variant='bodyMedium'
@@ -317,13 +326,7 @@ export default function StatsPage() {
                 {currentTotal > 0
                   ? `You've logged ${currentTotal} ${
                       currentTotal === 1 ? 'cigarette' : 'cigarettes'
-                    } this ${
-                      selectedPeriod === 'week'
-                        ? 'week'
-                        : selectedPeriod === 'month'
-                          ? 'month'
-                          : 'year'
-                    }. Keep tracking to see your progress!`
+                    } this ${currentPeriodLabel}. Keep tracking to see your progress!`
                   : 'Start tracking to set your goals and monitor progress 📊'}
               </Text>
             )}

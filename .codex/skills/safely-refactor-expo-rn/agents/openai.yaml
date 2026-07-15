@@ -1,0 +1,4 @@
+interface:
+  display_name: "Safely Refactor Expo RN"
+  short_description: "Safe production Expo refactoring"
+  default_prompt: "Use $safely-refactor-expo-rn to refactor this Expo React Native code without changing behavior."

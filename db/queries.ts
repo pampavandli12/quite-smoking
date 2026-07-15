@@ -24,8 +24,14 @@ const VALID_LOG_TIMESTAMP_SQL = VALID_TIMESTAMP_SQL.replace(
 
 type CountRow = { count: number };
 type BucketCountRow = { bucket: number; count: number };
-type TriggerCountRow = { trigger: string; count: number };
-type SmokingLogTimestampRow = { id: number; timestamp: number | string };
+export type TriggerCountRow = { trigger: string; count: number };
+export type SmokingLogTimestampRow = { id: number; timestamp: number | string };
+export type DetailedWeeklyBreakdownItem = {
+  count: number;
+  date: string;
+  day: string;
+  progress: number;
+};
 type SmokingLogRow = { id: number; timestamp: number | string };
 type SmokingLogWithTriggerRow = {
   id: number;
@@ -396,7 +402,7 @@ export async function getDetailedWeeklyBreakdown() {
     startOfWeek.setHours(0, 0, 0, 0);
 
     const dayCounts = await getWeeklyBreakdown();
-    const breakdown = [];
+    const breakdown: DetailedWeeklyBreakdownItem[] = [];
     const dayNames = [
       'Sunday',
       'Monday',
