@@ -11,6 +11,8 @@ export const expoDb = openDatabaseSync('quitSmoking.db');
 export const db = drizzle(expoDb, { schema });
 
 let sqliteQueue = Promise.resolve();
+let databaseReady = false;
+let databaseInitializationPromise: Promise<boolean> | null = null;
 
 function serializeSqlite<T>(operation: () => Promise<T>) {
   const next = sqliteQueue.then(operation, operation);
@@ -22,33 +24,11 @@ function serializeSqlite<T>(operation: () => Promise<T>) {
   return next;
 }
 
-export function dbExecAsync(source: string) {
+function dbExecAsync(source: string) {
   return serializeSqlite(() => expoDb.execAsync(source));
 }
 
-export function dbRunAsync(
-  source: string,
-  params: SQLiteBindParams = [],
-): Promise<SQLiteRunResult> {
-  return serializeSqlite(() => expoDb.runAsync(source, params));
-}
-
-export function dbGetFirstAsync<T>(
-  source: string,
-  params: SQLiteBindParams = [],
-) {
-  return serializeSqlite(() => expoDb.getFirstAsync<T>(source, params));
-}
-
-export function dbGetAllAsync<T>(
-  source: string,
-  params: SQLiteBindParams = [],
-) {
-  return serializeSqlite(() => expoDb.getAllAsync<T>(source, params));
-}
-
-// Initialize database tables
-export async function initializeDatabase() {
+async function runDatabaseInitialization() {
   try {
     // Create smoking_log table
     await dbExecAsync(`
@@ -105,12 +85,80 @@ export async function initializeDatabase() {
     }
 
     console.log('Database initialized successfully');
+    databaseReady = true;
     return true;
   } catch (error) {
     console.error(
       'Database initialization failed while preparing quitSmoking.db:',
       error,
     );
+    databaseReady = false;
     return false;
   }
+}
+
+// Initialize database tables
+export function initializeDatabase() {
+  if (databaseReady) {
+    return Promise.resolve(true);
+  }
+
+  if (!databaseInitializationPromise) {
+    databaseInitializationPromise = runDatabaseInitialization().finally(() => {
+      databaseInitializationPromise = null;
+    });
+  }
+
+  return databaseInitializationPromise;
+}
+
+export async function ensureDatabaseReady() {
+  if (databaseReady) {
+    return;
+  }
+
+  const initialized = await initializeDatabase();
+
+  if (!initialized) {
+    throw new Error('Database is not ready.');
+  }
+}
+
+/**
+ * @deprecated Use Drizzle query builders from db instead. Kept as a guarded
+ * compatibility wrapper so stale bundles or older modules cannot crash after
+ * the data-layer migration.
+ */
+export async function dbRunAsync(
+  source: string,
+  params: SQLiteBindParams = [],
+): Promise<SQLiteRunResult> {
+  await ensureDatabaseReady();
+  return serializeSqlite(() => expoDb.runAsync(source, params));
+}
+
+/**
+ * @deprecated Use Drizzle query builders from db instead. Kept as a guarded
+ * compatibility wrapper so stale bundles or older modules cannot crash after
+ * the data-layer migration.
+ */
+export async function dbGetFirstAsync<T>(
+  source: string,
+  params: SQLiteBindParams = [],
+) {
+  await ensureDatabaseReady();
+  return serializeSqlite(() => expoDb.getFirstAsync<T>(source, params));
+}
+
+/**
+ * @deprecated Use Drizzle query builders from db instead. Kept as a guarded
+ * compatibility wrapper so stale bundles or older modules cannot crash after
+ * the data-layer migration.
+ */
+export async function dbGetAllAsync<T>(
+  source: string,
+  params: SQLiteBindParams = [],
+) {
+  await ensureDatabaseReady();
+  return serializeSqlite(() => expoDb.getAllAsync<T>(source, params));
 }
