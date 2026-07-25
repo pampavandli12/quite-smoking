@@ -5,6 +5,7 @@ import {
   getYesterdayStats,
   logSmokingEvent,
   getNonSmokingStreak,
+  type SmokingLogTimestampRow,
 } from '@/db';
 import TriggerBottomSheet from '@/components/TriggerBottomSheet';
 import { useCallback, useEffect, useState } from 'react';
@@ -19,12 +20,24 @@ import {
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+function formatSmokingLogTime(log: SmokingLogTimestampRow) {
+  return new Date(log.timestamp).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+function formatCigaretteCount(count: number) {
+  return `${count} ${count === 1 ? 'cigarette' : 'cigarettes'}`;
+}
+
 export default function HomePage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [todayCount, setTodayCount] = useState(0);
   const [yesterdayCount, setYesterdayCount] = useState(0);
-  const [todayLogs, setTodayLogs] = useState<any[]>([]);
+  const [todayLogs, setTodayLogs] = useState<SmokingLogTimestampRow[]>([]);
   const [weeklyData, setWeeklyData] = useState([0, 0, 0, 0, 0, 0, 0]);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -159,7 +172,7 @@ export default function HomePage() {
               <Surface style={styles.statRow} elevation={0}>
                 <Text variant='titleMedium'>Today</Text>
                 <Text variant='titleMedium' style={styles.countText}>
-                  {todayCount} {todayCount === 1 ? 'cigarette' : 'cigarettes'}
+                  {formatCigaretteCount(todayCount)}
                 </Text>
               </Surface>
               {todayLogs.length > 0 && (
@@ -170,16 +183,7 @@ export default function HomePage() {
                     color={theme.colors.onSurfaceVariant}
                   />
                   <Text variant='bodySmall' style={styles.timeText}>
-                    {todayLogs
-                      .map((log) => {
-                        const time = new Date(log.timestamp);
-                        return time.toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true,
-                        });
-                      })
-                      .join(', ')}
+                    {todayLogs.map(formatSmokingLogTime).join(', ')}
                   </Text>
                 </Surface>
               )}
@@ -191,8 +195,7 @@ export default function HomePage() {
               <Surface style={styles.statRow} elevation={0}>
                 <Text variant='titleMedium'>Yesterday</Text>
                 <Text variant='titleMedium' style={styles.countText}>
-                  {yesterdayCount}{' '}
-                  {yesterdayCount === 1 ? 'cigarette' : 'cigarettes'}
+                  {formatCigaretteCount(yesterdayCount)}
                 </Text>
               </Surface>
             </Card.Content>

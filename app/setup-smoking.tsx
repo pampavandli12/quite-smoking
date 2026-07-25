@@ -8,6 +8,7 @@ import {
   Icon,
   Surface,
   IconButton,
+  type TextInputIconProps,
 } from 'react-native-paper';
 import { router } from 'expo-router';
 import { setSmokingSettings } from '@/db/queries';
@@ -50,7 +51,7 @@ export default function SmokingSetupScreen() {
       setSaving(false);
     }
   };
-  const searchAccessory = (accessoryProps) => (
+  const searchAccessory = (accessoryProps: Partial<TextInputIconProps>) => (
     <TextInput.Icon {...accessoryProps} icon='currency-inr' />
   );
   return (
