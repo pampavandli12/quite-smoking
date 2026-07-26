@@ -18,7 +18,7 @@ const isExpoGo = Constants.appOwnership === 'expo';
 // For Expo Go testing, use the Test Store API key from https://rev.cat/sdk-test-store
 const REVENUECAT_API_KEY = Platform.select({
   ios: REVENUE_CAT_KEYS.ios,
-  android: REVENUE_CAT_KEYS.android_test,
+  android: REVENUE_CAT_KEYS.android,
 });
 
 export const REVENUECAT_ENTITLEMENT_ID = 'QuitSmoke Pro';
