@@ -8,7 +8,7 @@ import {
   type SmokingLogTimestampRow,
 } from '@/db';
 import TriggerBottomSheet from '@/components/TriggerBottomSheet';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
@@ -43,6 +43,12 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState(false);
   const [isTriggerSheetVisible, setIsTriggerSheetVisible] = useState(false);
+  const weeklyTotal = useMemo(
+    () => weeklyData.reduce((total, count) => total + count, 0),
+    [weeklyData],
+  );
+  const weeklyAverage =
+    weeklyData.length > 0 ? Math.round(weeklyTotal / 7) : 0;
 
   // Load data from database
   const loadStats = useCallback(async () => {
@@ -211,11 +217,7 @@ export default function HomePage() {
           <Surface style={styles.insightItem} elevation={0}>
             <Icon source='chart-line' size={20} color={theme.colors.primary} />
             <Text variant='bodyMedium' style={styles.insightText}>
-              Average:{' '}
-              {weeklyData.length > 0
-                ? Math.round(weeklyData.reduce((a, b) => a + b, 0) / 7)
-                : 0}{' '}
-              cigarettes per day
+              Average: {weeklyAverage} cigarettes per day
             </Text>
           </Surface>
 
@@ -226,8 +228,7 @@ export default function HomePage() {
               color={theme.colors.primary}
             />
             <Text variant='bodyMedium' style={styles.insightText}>
-              Total this week: {weeklyData.reduce((a, b) => a + b, 0)}{' '}
-              cigarettes
+              Total this week: {weeklyTotal} cigarettes
             </Text>
           </Surface>
 

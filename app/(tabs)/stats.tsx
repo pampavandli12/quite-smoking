@@ -1,21 +1,33 @@
 import {
   getDetailedWeeklyBreakdown,
   getTodayStats,
+  getSmokingSettings,
   getTop5Triggers,
   getTopTrigger,
   getYesterdayStats,
-  type DetailedWeeklyBreakdownItem,
   type TriggerCountRow,
 } from '@/db';
 import StatsTimelineChart, {
   type StatsPeriod,
-  type TimelineSummary,
 } from '@/components/StatsTimelineChart';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ScrollView, StyleSheet } from 'react-native';
 import { Card, Icon, Surface, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  getComparisonLabel,
+  getCurrentPeriodLabel,
+  getPercentageChange,
+  type DetailedWeeklyBreakdownItem,
+  type SmokingBaseline,
+} from '@/utils/statistics';
+import { measureDevelopmentAsync } from '@/utils/developmentPerformance';
+import {
+  DailyBreakdownSection,
+  TopTriggersSection,
+} from '@/components/StatsBreakdownSections';
+import { loadTimeline } from '@/services/statsTimeline';
 
 const fallbackMessages = [
   'Every cigarette skipped is a victory 🏆',
@@ -68,18 +80,6 @@ function getFallbackMessage() {
   return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
 }
 
-function getComparisonLabel(period: StatsPeriod) {
-  return period === 'week'
-    ? 'last week'
-    : period === 'month'
-      ? 'last month'
-      : 'last year';
-}
-
-function getCurrentPeriodLabel(period: StatsPeriod) {
-  return period === 'week' ? 'week' : period === 'month' ? 'month' : 'year';
-}
-
 export default function StatsPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -91,82 +91,121 @@ export default function StatsPage() {
   >([]);
   const [healthInsight, setHealthInsight] = useState('');
   const [topTriggers, setTopTriggers] = useState<TriggerCountRow[]>([]);
-  const percentageChange =
-    previousTotal > 0
-      ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
-      : 0;
-
-  // Generate health insight
-  const generateHealthInsight = useCallback(async () => {
-    try {
-      const [today, yesterday, topTrigger] = await Promise.all([
-        getTodayStats(),
-        getYesterdayStats(),
-        getTopTrigger(),
-      ]);
-
-      // Priority 1: Progress message if there's data
-      if (today > 0 || yesterday > 0) {
-        setHealthInsight(getProgressMessage(today, yesterday));
-        return;
-      }
-
-      // Priority 2: Trigger message if there's a top trigger
-      if (topTrigger) {
-        setHealthInsight(getTriggerMessage(topTrigger));
-        return;
-      }
-
-      // Priority 3: Fallback message
-      setHealthInsight(getFallbackMessage());
-    } catch (error) {
-      console.error('Error generating health insight:', error);
-      setHealthInsight(getFallbackMessage());
-    }
-  }, []);
+  const [chartData, setChartData] = useState<number[]>([0]);
+  const [smokingSettings, setSmokingSettings] =
+    useState<SmokingBaseline | null>(null);
+  const statsRequestId = useRef(0);
+  const percentageChange = getPercentageChange(currentTotal, previousTotal);
 
   // Load stats from database
   const loadStats = useCallback(async () => {
-    try {
-      if (selectedPeriod === 'week') {
-        const [breakdown, triggers] = await Promise.all([
-          getDetailedWeeklyBreakdown(),
-          getTop5Triggers(),
-        ]);
+    const requestId = ++statsRequestId.current;
 
-        setDailyBreakdown(breakdown);
-        setTopTriggers(triggers);
-      } else {
-        setDailyBreakdown([]);
-        setTopTriggers([]);
-      }
+    await measureDevelopmentAsync(
+      `StatsPage load (${selectedPeriod})`,
+      async () => {
+        const loadChart = async () => {
+          try {
+            const timeline = await loadTimeline(selectedPeriod);
 
-      // Generate health insight
-      await generateHealthInsight();
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
-  }, [generateHealthInsight, selectedPeriod]);
+            if (requestId === statsRequestId.current) {
+              setCurrentTotal(timeline.currentTotal);
+              setPreviousTotal(timeline.previousTotal);
+              setChartData(timeline.data);
+            }
+          } catch (error) {
+            console.error('Error loading timeline chart:', error);
 
+            if (requestId === statsRequestId.current) {
+              setCurrentTotal(0);
+              setPreviousTotal(0);
+              setChartData([0]);
+            }
+          }
+        };
+
+        const loadDetails = async () => {
+          try {
+            if (selectedPeriod === 'week') {
+              const [breakdown, triggers] = await Promise.all([
+                getDetailedWeeklyBreakdown(),
+                getTop5Triggers(),
+              ]);
+
+              if (requestId !== statsRequestId.current) {
+                return;
+              }
+
+              setDailyBreakdown(breakdown);
+              setTopTriggers(triggers);
+            } else {
+              if (requestId !== statsRequestId.current) {
+                return;
+              }
+            }
+
+            const [today, yesterday, topTrigger] = await Promise.all([
+              getTodayStats(),
+              getYesterdayStats(),
+              getTopTrigger(),
+            ]);
+
+            if (requestId !== statsRequestId.current) {
+              return;
+            }
+
+            setHealthInsight(
+              today > 0 || yesterday > 0
+                ? getProgressMessage(today, yesterday)
+                : topTrigger
+                  ? getTriggerMessage(topTrigger)
+                  : getFallbackMessage(),
+            );
+          } catch (error) {
+            console.error('Error loading stats:', error);
+          }
+        };
+
+        if (selectedPeriod !== 'week') {
+          if (requestId === statsRequestId.current) {
+            // Preserve the original immediate clearing before insight loading.
+            setDailyBreakdown([]);
+            setTopTriggers([]);
+          }
+        }
+
+        await Promise.all([loadChart(), loadDetails()]);
+      },
+    );
+  }, [selectedPeriod]);
+
+  // Preserve the chart's original mount-only settings refresh behavior.
   useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+    getSmokingSettings()
+      .then((settings) => {
+        if (settings) {
+          setSmokingSettings(settings);
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading smoking settings:', error);
+      });
+  }, []);
 
-  // Reload stats when tab is focused
+  // Load on initial focus and reload whenever the tab regains focus.
   useFocusEffect(
     useCallback(() => {
       loadStats();
+
+      return () => {
+        statsRequestId.current += 1;
+      };
     }, [loadStats]),
   );
 
-  const handleTimelineSummaryChange = useCallback(
-    (summary: TimelineSummary) => {
-      setSelectedPeriod(summary.period);
-      setCurrentTotal(summary.currentTotal);
-      setPreviousTotal(summary.previousTotal);
-    },
-    [],
-  );
+  const handlePeriodChange = useCallback((period: StatsPeriod) => {
+    setSelectedPeriod(period);
+  }, []);
 
   const comparisonLabel = getComparisonLabel(selectedPeriod);
   const currentPeriodLabel = getCurrentPeriodLabel(selectedPeriod);
@@ -190,90 +229,20 @@ export default function StatsPage() {
           </Text>
         </Surface>
 
-        <StatsTimelineChart onSummaryChange={handleTimelineSummaryChange} />
+        <StatsTimelineChart
+          chartData={chartData}
+          currentTotal={currentTotal}
+          onPeriodChange={handlePeriodChange}
+          period={selectedPeriod}
+          previousTotal={previousTotal}
+          smokingSettings={smokingSettings}
+        />
 
-        {/* Top Triggers - Only for week view */}
-        {selectedPeriod === 'week' && topTriggers.length > 0 && (
-          <Surface style={styles.section} elevation={0}>
-            <Text variant='titleLarge' style={styles.sectionTitle}>
-              Top Triggers
-            </Text>
-            <Text variant='bodyMedium' style={styles.sectionSubtitle}>
-              What makes you reach for a cigarette
-            </Text>
-
-            {topTriggers.map((item, index) => (
-              <Card key={index} style={styles.triggerCard}>
-                <Card.Content style={styles.triggerCardContent}>
-                  <Surface style={styles.triggerLeft} elevation={0}>
-                    <Surface style={styles.triggerRank} elevation={0}>
-                      <Text variant='bodyMedium' style={styles.triggerRankText}>
-                        {index + 1}
-                      </Text>
-                    </Surface>
-                    <Text variant='bodyLarge' style={styles.triggerName}>
-                      {item.trigger}
-                    </Text>
-                  </Surface>
-                  <Surface style={styles.triggerRight} elevation={0}>
-                    <Surface
-                      style={styles.triggerProgressBarContainer}
-                      elevation={0}
-                    >
-                      <View
-                        style={[
-                          styles.triggerProgressBarFilled,
-                          {
-                            width: `${(item.count / (topTriggers[0]?.count || 1)) * 100}%`,
-                          },
-                        ]}
-                      />
-                    </Surface>
-                    <Text variant='titleMedium' style={styles.triggerCount}>
-                      {item.count}
-                    </Text>
-                  </Surface>
-                </Card.Content>
-              </Card>
-            ))}
-          </Surface>
-        )}
-
-        {/* Daily Breakdown - Only for week view */}
-        {selectedPeriod === 'week' && dailyBreakdown.length > 0 && (
-          <Surface style={styles.section} elevation={0}>
-            <Text variant='titleLarge' style={styles.sectionTitle}>
-              Daily Breakdown
-            </Text>
-
-            {dailyBreakdown.map((item, index) => (
-              <Card key={index} style={styles.dayCard}>
-                <Card.Content style={styles.dayCardContent}>
-                  <Surface style={styles.dayLeft} elevation={0}>
-                    <Text variant='bodyLarge' style={styles.dayName}>
-                      {item.day}
-                    </Text>
-                    <Text variant='bodySmall' style={styles.dayDate}>
-                      {item.date}
-                    </Text>
-                  </Surface>
-                  <Surface style={styles.dayRight} elevation={0}>
-                    <Surface style={styles.progressBarContainer} elevation={0}>
-                      <View
-                        style={[
-                          styles.progressBarFilled,
-                          { width: `${item.progress * 100}%` },
-                        ]}
-                      />
-                    </Surface>
-                    <Text variant='titleMedium' style={styles.dayCount}>
-                      {item.count}
-                    </Text>
-                  </Surface>
-                </Card.Content>
-              </Card>
-            ))}
-          </Surface>
+        {selectedPeriod === 'week' && (
+          <>
+            <TopTriggersSection triggers={topTriggers} />
+            <DailyBreakdownSection breakdown={dailyBreakdown} />
+          </>
         )}
 
         {/* Your Goals */}
@@ -380,119 +349,6 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     opacity: 0.7,
-  },
-  section: {
-    marginBottom: 24,
-    backgroundColor: 'transparent',
-  },
-  sectionTitle: {
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    opacity: 0.6,
-    marginBottom: 16,
-  },
-  triggerCard: {
-    marginBottom: 12,
-  },
-  triggerCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  triggerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  triggerRank: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  triggerRankText: {
-    color: '#4285F4',
-    fontWeight: '600',
-  },
-  triggerName: {
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  triggerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  triggerProgressBarContainer: {
-    flex: 1,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E8E8E8',
-    overflow: 'hidden',
-  },
-  triggerProgressBarFilled: {
-    height: '100%',
-    backgroundColor: '#4285F4',
-    borderRadius: 6,
-  },
-  triggerCount: {
-    fontWeight: '600',
-    minWidth: 30,
-    textAlign: 'right',
-    color: '#4285F4',
-  },
-  dayCard: {
-    marginBottom: 12,
-  },
-  dayCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  dayLeft: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  dayName: {
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  dayDate: {
-    opacity: 0.6,
-  },
-  dayRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1.8,
-    backgroundColor: 'transparent',
-  },
-  progressBarContainer: {
-    flex: 1,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E8E8E8',
-    overflow: 'hidden',
-  },
-  progressBarFilled: {
-    height: '100%',
-    backgroundColor: '#4285F4',
-    borderRadius: 6,
-  },
-  dayCount: {
-    fontWeight: '600',
-    minWidth: 30,
-    textAlign: 'right',
   },
   goalCard: {
     marginBottom: 24,

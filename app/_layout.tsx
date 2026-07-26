@@ -20,9 +20,7 @@ type DatabaseStatus = "loading" | "ready" | "failed";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [theme, setTheme] = useState(
-    colorScheme === "dark" ? darkTheme : lightTheme
-  );
+  const theme = colorScheme === "dark" ? darkTheme : lightTheme;
   const [databaseStatus, setDatabaseStatus] =
     useState<DatabaseStatus>("loading");
   const [purchasesInitialized, setPurchasesInitialized] = useState(false);
@@ -79,10 +77,6 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [databaseStatus, fontsLoaded, purchasesInitialized]);
-
-  useEffect(() => {
-    setTheme(colorScheme === "dark" ? darkTheme : lightTheme);
-  }, [colorScheme]);
 
   if (!fontsLoaded || databaseStatus === "loading" || !purchasesInitialized) {
     return null;

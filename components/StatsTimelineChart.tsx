@@ -1,14 +1,4 @@
-import {
-  getMonthlyBreakdown,
-  getPreviousWeekStats,
-  getSmokingCountByDateRange,
-  getWeeklyBreakdown,
-  getWeekStats,
-  getYearlyBreakdown,
-  getSmokingSettings,
-} from '@/db';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import Animated, {
@@ -17,20 +7,26 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { Card, Icon, Surface, Text, useTheme } from 'react-native-paper';
+import {
+  getAverage,
+  getAverageLabel,
+  getComparisonLabel,
+  getPercentageChange,
+  getSavings,
+  getTotalLabel,
+  type SmokingBaseline,
+  type StatsPeriod,
+} from '@/utils/statistics';
 
-export type StatsPeriod = 'week' | 'month' | 'year';
-
-export type TimelineSummary = {
-  average: number;
-  comparisonLabel: string;
-  currentTotal: number;
-  percentageChange: number;
-  period: StatsPeriod;
-  previousTotal: number;
-};
+export type { StatsPeriod } from '@/utils/statistics';
 
 type StatsTimelineChartProps = {
-  onSummaryChange?: (summary: TimelineSummary) => void;
+  chartData: number[];
+  currentTotal: number;
+  onPeriodChange: (period: StatsPeriod) => void;
+  period: StatsPeriod;
+  previousTotal: number;
+  smokingSettings: SmokingBaseline | null;
 };
 
 const EMPTY_DATA = [0];
@@ -50,122 +46,6 @@ const YEAR_LABELS = [
   'Nov',
   'Dec',
 ];
-
-function getRangeTotal(start: Date, end: Date) {
-  return getSmokingCountByDateRange(start.toISOString(), end.toISOString());
-}
-
-async function getPreviousMonthStats() {
-  const today = new Date();
-  const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const end = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    0,
-    23,
-    59,
-    59,
-    999,
-  );
-
-  return getRangeTotal(start, end);
-}
-
-async function getPreviousYearStats() {
-  const today = new Date();
-  const start = new Date(today.getFullYear() - 1, 0, 1);
-  const end = new Date(today.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
-
-  return getRangeTotal(start, end);
-}
-
-function getAverage(period: StatsPeriod, total: number) {
-  if (total <= 0) {
-    return 0;
-  }
-
-  if (period === 'week') {
-    return Math.round(total / 7);
-  }
-
-  if (period === 'month') {
-    return Math.round(total / 4);
-  }
-
-  return Math.round(total / 12);
-}
-
-function getComparisonLabel(period: StatsPeriod) {
-  if (period === 'week') {
-    return 'last week';
-  }
-
-  if (period === 'month') {
-    return 'last month';
-  }
-
-  return 'last year';
-}
-
-function getAverageLabel(period: StatsPeriod) {
-  if (period === 'week') {
-    return 'Daily Average';
-  }
-
-  if (period === 'month') {
-    return 'Weekly Average';
-  }
-
-  return 'Monthly Average';
-}
-
-function getTotalLabel(period: StatsPeriod) {
-  if (period === 'week') {
-    return 'Total This Week';
-  }
-
-  if (period === 'month') {
-    return 'Total This Month';
-  }
-
-  return 'Total This Year';
-}
-
-async function loadTimeline(period: StatsPeriod) {
-  if (period === 'week') {
-    const [currentTotal, previousTotal, data] = await Promise.all([
-      getWeekStats(),
-      getPreviousWeekStats(),
-      getWeeklyBreakdown(),
-    ]);
-
-    return { currentTotal, previousTotal, data };
-  }
-
-  if (period === 'month') {
-    const [data, previousTotal] = await Promise.all([
-      getMonthlyBreakdown(),
-      getPreviousMonthStats(),
-    ]);
-
-    return {
-      currentTotal: data.reduce((sum, value) => sum + value, 0),
-      previousTotal,
-      data,
-    };
-  }
-
-  const [data, previousTotal] = await Promise.all([
-    getYearlyBreakdown(),
-    getPreviousYearStats(),
-  ]);
-
-  return {
-    currentTotal: data.reduce((sum, value) => sum + value, 0),
-    previousTotal,
-    data,
-  };
-}
 
 function getChartLabels(period: StatsPeriod) {
   if (period === 'week') {
@@ -275,162 +155,84 @@ function AnimatedPeriodSelector({
 }
 
 export default function StatsTimelineChart({
-  onSummaryChange,
+  chartData,
+  currentTotal,
+  onPeriodChange,
+  period,
+  previousTotal,
+  smokingSettings,
 }: StatsTimelineChartProps) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
-  const [period, setPeriod] = useState<StatsPeriod>('week');
-  const [currentTotal, setCurrentTotal] = useState(0);
-  const [previousTotal, setPreviousTotal] = useState(0);
-  const [chartData, setChartData] = useState<number[]>(EMPTY_DATA);
-  const [smokingSettings, setSmokingSettings] = useState<{
-    cigarettesPerDay: number;
-    costPerCigaretteCents: number;
-  } | null>(null);
 
   const average = getAverage(period, currentTotal);
   const comparisonLabel = getComparisonLabel(period);
-  const percentageChange =
-    previousTotal > 0
-      ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
-      : 0;
-
-  // Calculate money saved
-  let moneySaved = 0;
-  let cigarettesSaved = 0;
-
-  if (smokingSettings) {
-    let cigarettesIfNormal = 0;
-
-    if (period === 'week') {
-      cigarettesIfNormal = smokingSettings.cigarettesPerDay * 7;
-    } else if (period === 'month') {
-      const today = new Date();
-      const daysInMonth = new Date(
-        today.getFullYear(),
-        today.getMonth() + 1,
-        0,
-      ).getDate();
-      cigarettesIfNormal = smokingSettings.cigarettesPerDay * daysInMonth;
-    } else {
-      cigarettesIfNormal = smokingSettings.cigarettesPerDay * 365;
-    }
-
-    // Can be negative if smoking more than normal
-    cigarettesSaved = cigarettesIfNormal - currentTotal;
-    moneySaved = Math.round(
-      (cigarettesSaved * smokingSettings.costPerCigaretteCents) / 100,
-    );
-  }
+  const percentageChange = getPercentageChange(currentTotal, previousTotal);
+  const { cigarettesSaved, moneySaved } = getSavings(
+    smokingSettings,
+    period,
+    currentTotal,
+  );
 
   const costPerCigaretteDisplay =
     smokingSettings && smokingSettings.costPerCigaretteCents
       ? (smokingSettings.costPerCigaretteCents / 100).toFixed(2)
       : '0.00';
 
-  const summary = useMemo(
+  const chartConfig = useMemo(
     () => ({
-      average,
-      comparisonLabel,
-      currentTotal,
-      percentageChange,
-      period,
-      previousTotal,
+      backgroundColor: theme.colors.surface,
+      backgroundGradientFrom: theme.colors.surface,
+      backgroundGradientTo: theme.colors.surface,
+      decimalPlaces: 0,
+      color: (opacity = 1) => {
+        const primary = theme.colors.primary;
+        return `${primary}${Math.round(opacity * 255)
+          .toString(16)
+          .padStart(2, '0')}`;
+      },
+      labelColor: () => theme.colors.onSurface,
+      strokeWidth: 3,
+      propsForBackgroundLines: {
+        stroke: 'transparent',
+      },
+      propsForLabels: {
+        fontSize: period === 'year' ? 10 : 11,
+        fontWeight: '400',
+      },
+      propsForDots: {
+        r: '5',
+        strokeWidth: '3',
+        stroke: theme.colors.primary,
+        fill: theme.colors.surface,
+      },
     }),
     [
-      average,
-      comparisonLabel,
-      currentTotal,
-      percentageChange,
       period,
-      previousTotal,
+      theme.colors.onSurface,
+      theme.colors.primary,
+      theme.colors.surface,
     ],
   );
 
-  const loadChart = useCallback(async () => {
-    try {
-      const timeline = await loadTimeline(period);
-      setCurrentTotal(timeline.currentTotal);
-      setPreviousTotal(timeline.previousTotal);
-      setChartData(timeline.data);
-    } catch (error) {
-      console.error('Error loading timeline chart:', error);
-      setCurrentTotal(0);
-      setPreviousTotal(0);
-      setChartData(EMPTY_DATA);
-    }
-  }, [period]);
-
-  useEffect(() => {
-    loadChart();
-  }, [loadChart]);
-
-  // Load smoking settings
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const settings = await getSmokingSettings();
-        if (settings) {
-          setSmokingSettings(settings);
-        }
-      } catch (error) {
-        console.error('Error loading smoking settings:', error);
-      }
-    };
-
-    loadSettings();
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadChart();
-    }, [loadChart]),
+  const data = useMemo(
+    () => ({
+      labels: getChartLabels(period),
+      datasets: [
+        {
+          data: chartData.length > 0 ? chartData : EMPTY_DATA,
+        },
+      ],
+    }),
+    [chartData, period],
   );
-
-  useEffect(() => {
-    onSummaryChange?.(summary);
-  }, [onSummaryChange, summary]);
-
-  const chartConfig = {
-    backgroundColor: theme.colors.surface,
-    backgroundGradientFrom: theme.colors.surface,
-    backgroundGradientTo: theme.colors.surface,
-    decimalPlaces: 0,
-    color: (opacity = 1) => {
-      const primary = theme.colors.primary;
-      return `${primary}${Math.round(opacity * 255)
-        .toString(16)
-        .padStart(2, '0')}`;
-    },
-    labelColor: () => theme.colors.onSurface,
-    strokeWidth: 3,
-    propsForBackgroundLines: {
-      stroke: 'transparent',
-    },
-    propsForLabels: {
-      fontSize: period === 'year' ? 10 : 11,
-      fontWeight: '400',
-    },
-    propsForDots: {
-      r: '5',
-      strokeWidth: '3',
-      stroke: theme.colors.primary,
-      fill: theme.colors.surface,
-    },
-  };
-
-  const data = {
-    labels: getChartLabels(period),
-    datasets: [
-      {
-        data: chartData.length > 0 ? chartData : EMPTY_DATA,
-      },
-    ],
-  };
 
   return (
     <>
-      <AnimatedPeriodSelector period={period} onPeriodChange={setPeriod} />
+      <AnimatedPeriodSelector
+        period={period}
+        onPeriodChange={onPeriodChange}
+      />
 
       {/* Money Saved Card */}
       {smokingSettings &&

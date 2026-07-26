@@ -1,4 +1,13 @@
-import { dbGetAllAsync, dbGetFirstAsync, dbRunAsync } from './client';
+import {
+  dbGetAllAsync,
+  dbGetFirstAsync,
+  dbRunAsync,
+  dbTransactionAsync,
+} from './client';
+import {
+  groupSmokingLogsWithTriggers,
+  type SmokingLogWithTriggerRow,
+} from './groupSmokingLogs';
 
 const MIN_VALID_TIMESTAMP_MS = new Date('2000-01-01T00:00:00.000Z').getTime();
 
@@ -32,13 +41,7 @@ export type DetailedWeeklyBreakdownItem = {
   day: string;
   progress: number;
 };
-type SmokingLogRow = { id: number; timestamp: number | string };
-type SmokingLogWithTriggerRow = {
-  id: number;
-  timestamp: number | string;
-  triggerId: number | null;
-  trigger: string | null;
-};
+export type SmokingLogRow = { id: number; timestamp: number | string };
 type SmokedDayRow = { day: string };
 type SmokingSettingsRow = {
   id: number;
@@ -46,6 +49,18 @@ type SmokingSettingsRow = {
   costPerCigaretteCents: number;
   createdAt: number | string;
 };
+
+export type LogSmokingEventResult =
+  | { success: true; logId: number }
+  | { success: false; error: unknown };
+
+export type DatabaseMutationResult =
+  | { success: true }
+  | { success: false; error: unknown };
+
+export type SaveSmokingSettingsResult =
+  | { success: true; result: SmokingSettingsRow[] }
+  | { success: false; error: unknown };
 
 function toTimestampMs(date: string | Date) {
   const timestamp =
@@ -117,37 +132,38 @@ function fillCounts(size: number, rows: BucketCountRow[]) {
 }
 
 // Insert a smoking log entry
-export async function logSmokingEvent(triggers: string[] = []) {
+export async function logSmokingEvent(
+  triggers: string[] = [],
+): Promise<LogSmokingEventResult> {
   try {
     const timestamp = Date.now();
+    const logId = await dbTransactionAsync(async (transaction) => {
+      const result = await transaction.getFirstAsync<{ id: number }>(
+        `
+          INSERT INTO smoking_log (timestamp)
+          VALUES (?)
+          RETURNING id
+        `,
+        [timestamp],
+      );
+      const insertedLogId = result?.id;
 
-    // Insert into smoking_log
-    const result = await dbGetFirstAsync<{ id: number }>(
-      `
-        INSERT INTO smoking_log (timestamp)
-        VALUES (?)
-        RETURNING id
-      `,
-      [timestamp],
-    );
-    const logId = result?.id;
+      if (!insertedLogId) {
+        throw new Error('Smoking log insert did not return an id.');
+      }
 
-    if (!logId) {
-      throw new Error('Smoking log insert did not return an id.');
-    }
-
-    // Insert triggers if provided
-    if (triggers.length > 0) {
       for (const trigger of triggers) {
-        await dbRunAsync(
+        await transaction.runAsync(
           `
             INSERT INTO smoking_log_triggers (log_id, trigger)
             VALUES (?, ?)
           `,
-          [logId, trigger],
+          [insertedLogId, trigger],
         );
       }
-    }
+
+      return insertedLogId;
+    });
 
     return { success: true, logId };
   } catch (error) {
@@ -157,7 +173,7 @@ export async function logSmokingEvent(triggers: string[] = []) {
 }
 
 // Get all smoking logs
-export async function getAllSmokingLogs() {
+export async function getAllSmokingLogs(): Promise<0 | SmokingLogRow[]> {
   try {
     const logs = await dbGetAllAsync<SmokingLogRow>(
       `
@@ -202,24 +218,7 @@ export async function getSmokingLogsWithTriggers() {
       `,
     );
 
-    // Group by log id
-    const groupedLogs = logs.reduce((acc: any[], log: any) => {
-      const existingLog = acc.find((l) => l.id === log.id);
-      if (existingLog) {
-        if (log.trigger) {
-          existingLog.triggers.push(log.trigger);
-        }
-      } else {
-        acc.push({
-          id: log.id,
-          timestamp: log.timestamp,
-          triggers: log.trigger ? [log.trigger] : [],
-        });
-      }
-      return acc;
-    }, []);
-
-    return groupedLogs;
+    return groupSmokingLogsWithTriggers(logs);
   } catch (error) {
     console.error('Error fetching smoking logs with triggers:', error);
     return [];
@@ -240,25 +239,27 @@ export async function getSmokingCountByDateRange(
 }
 
 // Delete a smoking log entry
-export async function deleteSmokingLog(logId: number) {
+export async function deleteSmokingLog(
+  logId: number,
+): Promise<DatabaseMutationResult> {
   try {
-    // Delete triggers first (foreign key constraint)
-    await dbRunAsync(
-      `
-        DELETE FROM smoking_log_triggers
-        WHERE log_id = ?
-      `,
-      [logId],
-    );
+    await dbTransactionAsync(async (transaction) => {
+      await transaction.runAsync(
+        `
+          DELETE FROM smoking_log_triggers
+          WHERE log_id = ?
+        `,
+        [logId],
+      );
 
-    // Delete the log
-    await dbRunAsync(
-      `
-        DELETE FROM smoking_log
-        WHERE id = ?
-      `,
-      [logId],
-    );
+      await transaction.runAsync(
+        `
+          DELETE FROM smoking_log
+          WHERE id = ?
+        `,
+        [logId],
+      );
+    });
 
     return { success: true };
   } catch (error) {
@@ -510,7 +511,7 @@ export async function getSmokingSettings() {
 export async function setSmokingSettings(
   cigarettesPerDay: number,
   costPerCigarette: number,
-) {
+): Promise<SaveSmokingSettingsResult> {
   try {
     const cents = Math.round(costPerCigarette * 100);
     const createdAt = Date.now();

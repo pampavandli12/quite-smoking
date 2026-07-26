@@ -13,6 +13,10 @@ import {
 import { router } from 'expo-router';
 import { setSmokingSettings } from '@/db/queries';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  areSmokingSettingsValid,
+  parseSmokingSettings,
+} from '@/utils/smokingSettings';
 
 export default function SmokingSetupScreen() {
   const theme = useTheme();
@@ -21,11 +25,8 @@ export default function SmokingSetupScreen() {
   const [costPerCigarette, setCostPerCigarette] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const valid = () => {
-    const cpd = parseInt(cigarettesPerDay, 10);
-    const cost = parseFloat(costPerCigarette);
-    return !isNaN(cpd) && cpd > 0 && !isNaN(cost) && cost > 0;
-  };
+  const valid = () =>
+    areSmokingSettingsValid(cigarettesPerDay, costPerCigarette);
 
   const handleSave = async () => {
     if (!valid()) {
@@ -35,9 +36,14 @@ export default function SmokingSetupScreen() {
 
     setSaving(true);
     try {
-      const cpd = parseInt(cigarettesPerDay, 10);
-      const cost = parseFloat(costPerCigarette);
-      const res = await setSmokingSettings(cpd, cost);
+      const parsed = parseSmokingSettings(
+        cigarettesPerDay,
+        costPerCigarette,
+      );
+      const res = await setSmokingSettings(
+        parsed.cigarettesPerDay,
+        parsed.costPerCigarette,
+      );
       if (res && res.success) {
         router.replace('/');
       } else {

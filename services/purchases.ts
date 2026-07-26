@@ -6,6 +6,10 @@ import Purchases, {
   PurchasesOffering,
   PurchasesPackage,
 } from 'react-native-purchases';
+import {
+  getErrorMessage,
+  isUserCancelledPurchaseError,
+} from '@/utils/purchaseErrors';
 
 // Check if running in Expo Go
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -14,10 +18,16 @@ const isExpoGo = Constants.appOwnership === 'expo';
 // For Expo Go testing, use the Test Store API key from https://rev.cat/sdk-test-store
 const REVENUECAT_API_KEY = Platform.select({
   ios: REVENUE_CAT_KEYS.ios,
-  android: REVENUE_CAT_KEYS.android, // NOTE: Test revenuecat API key for Android (from RevenueCat dashboard)
+  android: REVENUE_CAT_KEYS.android_test,
 });
 
 export const REVENUECAT_ENTITLEMENT_ID = 'QuitSmoke Pro';
+
+export type PurchaseOperationResult = {
+  success: boolean;
+  customerInfo?: CustomerInfo;
+  error?: unknown;
+};
 
 class PurchaseService {
   private static instance: PurchaseService;
@@ -70,13 +80,16 @@ class PurchaseService {
       }
 
       this.isConfigured = true;
-      console.log('RevenueCat initialized successfully');
-    } catch (error: any) {
+      if (__DEV__) {
+        console.log('RevenueCat initialized successfully');
+      }
+    } catch (error: unknown) {
       console.error('Failed to initialize RevenueCat:', error);
       // If initialization fails, fall back to mock mode
+      const errorMessage = getErrorMessage(error);
       if (
-        error.message?.includes('Expo Go') ||
-        error.message?.includes('native store')
+        errorMessage.includes('Expo Go') ||
+        errorMessage.includes('native store')
       ) {
         console.warn('Falling back to mock mode for Expo Go');
         this.mockMode = true;
@@ -116,7 +129,7 @@ class PurchaseService {
    */
   async purchasePackage(
     packageToPurchase: PurchasesPackage,
-  ): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: any }> {
+  ): Promise<PurchaseOperationResult> {
     if (this.mockMode) {
       console.log('Mock mode: Simulating successful purchase');
       // Simulate successful purchase in mock mode
@@ -134,8 +147,8 @@ class PurchaseService {
       const { customerInfo } =
         await Purchases.purchasePackage(packageToPurchase);
       return { success: true, customerInfo };
-    } catch (error: any) {
-      if (!error.userCancelled) {
+    } catch (error: unknown) {
+      if (!isUserCancelledPurchaseError(error)) {
         console.error('Purchase error:', error);
       }
       return { success: false, error };
@@ -145,11 +158,7 @@ class PurchaseService {
   /**
    * Restore previous purchases
    */
-  async restorePurchases(): Promise<{
-    success: boolean;
-    customerInfo?: CustomerInfo;
-    error?: any;
-  }> {
+  async restorePurchases(): Promise<PurchaseOperationResult> {
     if (this.mockMode) {
       console.log('Mock mode: No purchases to restore');
       return {

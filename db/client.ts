@@ -2,9 +2,16 @@ import { drizzle } from 'drizzle-orm/expo-sqlite';
 import {
   openDatabaseSync,
   type SQLiteBindParams,
+  type SQLiteDatabase,
   type SQLiteRunResult,
 } from 'expo-sqlite';
 import * as schema from './schema';
+import {
+  CREATE_INDEXES_SQL,
+  CREATE_TABLES_SQL,
+  DATABASE_VERSION,
+  NORMALIZE_LEGACY_TIMESTAMPS_SQL,
+} from './migrations';
 
 export const expoDb = openDatabaseSync('quitSmoking.db');
 
@@ -47,64 +54,50 @@ export function dbGetAllAsync<T>(
   return serializeSqlite(() => expoDb.getAllAsync<T>(source, params));
 }
 
+export function dbTransactionAsync<T>(
+  operation: (transaction: SQLiteDatabase) => Promise<T>,
+) {
+  return serializeSqlite(async () => {
+    const results: T[] = [];
+
+    await expoDb.withTransactionAsync(async () => {
+      results.push(await operation(expoDb));
+    });
+
+    if (results.length !== 1) {
+      throw new Error('Database transaction completed without a result.');
+    }
+
+    return results[0];
+  });
+}
+
 // Initialize database tables
 export async function initializeDatabase() {
   try {
-    // Create smoking_log table
-    await dbExecAsync(`
-      CREATE TABLE IF NOT EXISTS smoking_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL DEFAULT (cast(strftime('%s', 'now') as integer) * 1000)
-      );
-    `);
+    await dbExecAsync(CREATE_TABLES_SQL);
 
-    // Create smoking_log_triggers table
-    await dbExecAsync(`
-      CREATE TABLE IF NOT EXISTS smoking_log_triggers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        log_id INTEGER NOT NULL,
-        trigger TEXT NOT NULL,
-        FOREIGN KEY (log_id) REFERENCES smoking_log(id)
-      );
-    `);
+    const versionRow = await dbGetFirstAsync<{ userVersion: number }>(
+      'SELECT user_version as userVersion FROM pragma_user_version',
+    );
+    const currentVersion = versionRow?.userVersion ?? 0;
 
-    // Create user_smoking_settings table
-    await dbExecAsync(`
-      CREATE TABLE IF NOT EXISTS user_smoking_settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cigarettes_per_day INTEGER NOT NULL,
-        cost_per_cigarette_cents INTEGER NOT NULL,
-        created_at INTEGER NOT NULL DEFAULT (cast(strftime('%s', 'now') as integer) * 1000)
-      );
-    `);
-
-    await dbExecAsync(`
-      DROP INDEX IF EXISTS idx_smoking_log_timestamp_ms;
-
-      UPDATE smoking_log
-      SET timestamp = CAST(strftime('%s', timestamp, 'utc') AS INTEGER) * 1000
-      WHERE typeof(timestamp) = 'text'
-        AND strftime('%s', timestamp, 'utc') IS NOT NULL;
-
-      UPDATE user_smoking_settings
-      SET created_at = CAST(strftime('%s', created_at, 'utc') AS INTEGER) * 1000
-      WHERE typeof(created_at) = 'text'
-        AND strftime('%s', created_at, 'utc') IS NOT NULL;
-    `);
+    if (currentVersion < DATABASE_VERSION) {
+      await dbTransactionAsync(async (transaction) => {
+        await transaction.execAsync(NORMALIZE_LEGACY_TIMESTAMPS_SQL);
+        await transaction.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+      });
+    }
 
     try {
-      await dbExecAsync(`
-        CREATE INDEX IF NOT EXISTS idx_smoking_log_timestamp
-        ON smoking_log(timestamp);
-
-        CREATE INDEX IF NOT EXISTS idx_smoking_log_triggers_log_id
-        ON smoking_log_triggers(log_id);
-      `);
+      await dbExecAsync(CREATE_INDEXES_SQL);
     } catch (indexError) {
       console.warn('Database indexes could not be created:', indexError);
     }
 
-    console.log('Database initialized successfully');
+    if (__DEV__) {
+      console.log('Database initialized successfully');
+    }
     return true;
   } catch (error) {
     console.error(

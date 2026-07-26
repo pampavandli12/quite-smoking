@@ -24,6 +24,11 @@ import {
 import type { PurchasesPackage } from 'react-native-purchases';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { URL_LINKS } from '@/utils/constants';
+import { isUserCancelledPurchaseError } from '@/utils/purchaseErrors';
+import {
+  PaywallBenefits,
+  PaywallFeatures,
+} from '@/components/PaywallDetails';
 
 const PAYWALL_BYPASS = Constants.expoConfig?.extra?.PAYWALL_BYPASS === 'true';
 export default function SubscriptionPage() {
@@ -37,7 +42,6 @@ export default function SubscriptionPage() {
   const checkSubscription = useCallback(async () => {
     try {
       const customerInfo = await PurchaseService.getCustomerInfo();
-      console.log('Customer Info:', JSON.stringify(customerInfo, null, 2));
       setChecking(false);
       if (
         customerInfo &&
@@ -117,7 +121,7 @@ export default function SubscriptionPage() {
             onPress: () => router.replace('/(tabs)/home'),
           },
         ]);
-      } else if (error && !error.userCancelled) {
+      } else if (error && !isUserCancelledPurchaseError(error)) {
         Alert.alert(
           'Purchase Failed',
           'Something went wrong. Please try again.',
@@ -221,79 +225,7 @@ export default function SubscriptionPage() {
 
       <Divider style={styles.divider} />
 
-      {/* What You'll Get Section */}
-      <Surface style={styles.section} elevation={0}>
-        <Text variant='titleLarge' style={styles.sectionTitle}>
-          What You&apos;ll Get
-        </Text>
-
-        {/* Smoking history */}
-        <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='chart-bar' size={24} color='#4CAF50' />
-          <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant='bodyLarge' style={styles.featureTitle}>
-              Full smoking history
-            </Text>
-            <Text variant='bodyMedium' style={styles.featureDescription}>
-              See all your past cigarette logs with daily, weekly, and monthly
-              breakdowns.
-            </Text>
-          </Surface>
-        </Surface>
-        {/* Money saved */}
-        <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='currency-inr' size={24} color='#4CAF50' />
-          <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant='bodyLarge' style={styles.featureTitle}>
-              Money saved
-            </Text>
-            <Text variant='bodyMedium' style={styles.featureDescription}>
-              Watch your savings grow as you stay smoke-free. It&apos;s not just
-              good for your health, but also your wallet!
-            </Text>
-          </Surface>
-        </Surface>
-        {/* Smoke-free streaks */}
-        <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='calendar-check' size={24} color='#4CAF50' />
-          <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant='bodyLarge' style={styles.featureTitle}>
-              Smoke-free streaks
-            </Text>
-            <Text variant='bodyMedium' style={styles.featureDescription}>
-              Track your streak, hit milestones, and feel the momentum of every
-              smoke-free day.
-            </Text>
-          </Surface>
-        </Surface>
-
-        {/* Trigger analysis */}
-        <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='fire' size={24} color='#4CAF50' />
-          <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant='bodyLarge' style={styles.featureTitle}>
-              Trigger analysis
-            </Text>
-            <Text variant='bodyMedium' style={styles.featureDescription}>
-              Discover what situations and emotions drive your cravings the
-              most.
-            </Text>
-          </Surface>
-        </Surface>
-        {/* Peak smoking hours */}
-        <Surface style={styles.featureItem} elevation={0}>
-          <Icon source='clock-time-eleven-outline' size={24} color='#4CAF50' />
-          <Surface style={styles.featureTextContainer} elevation={0}>
-            <Text variant='bodyLarge' style={styles.featureTitle}>
-              Peak smoking hours
-            </Text>
-            <Text variant='bodyMedium' style={styles.featureDescription}>
-              See exactly which hours of the day you smoke most — awareness is
-              the first step.
-            </Text>
-          </Surface>
-        </Surface>
-      </Surface>
+      <PaywallFeatures />
 
       <Divider style={styles.divider} />
 
@@ -307,33 +239,7 @@ export default function SubscriptionPage() {
         </Text>
       </Surface>
 
-      {/* Benefits List */}
-      <Surface
-        style={[
-          styles.benefitsCard,
-          { backgroundColor: theme.colors.surfaceVariant },
-        ]}
-        elevation={0}
-      >
-        <Surface style={styles.benefitRow} elevation={0}>
-          <Icon source='check-circle' size={20} color='#4CAF50' />
-          <Text variant='bodyMedium' style={styles.benefitText}>
-            7 days completely free
-          </Text>
-        </Surface>
-        <Surface style={styles.benefitRow} elevation={0}>
-          <Icon source='check-circle' size={20} color='#4CAF50' />
-          <Text variant='bodyMedium' style={styles.benefitText}>
-            Cancel anytime
-          </Text>
-        </Surface>
-        <Surface style={styles.benefitRow} elevation={0}>
-          <Icon source='check-circle' size={20} color='#4CAF50' />
-          <Text variant='bodyMedium' style={styles.benefitText}>
-            Full access to all features
-          </Text>
-        </Surface>
-      </Surface>
+      <PaywallBenefits />
 
       {/* Payment Methods */}
       <Surface style={styles.paymentSection} elevation={0}>
@@ -404,11 +310,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  titleSection: {
-    alignItems: 'center',
-    marginBottom: 16,
-    backgroundColor: 'transparent',
-  },
   title: {
     fontWeight: 'bold',
     textAlign: 'center',
@@ -421,32 +322,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: 20,
-  },
-  section: {
-    marginBottom: 16,
-    backgroundColor: 'transparent',
-  },
-  sectionTitle: {
-    fontWeight: '600',
-    marginBottom: 20,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-    backgroundColor: 'transparent',
-  },
-  featureTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-    backgroundColor: 'transparent',
-  },
-  featureTitle: {
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  featureDescription: {
-    opacity: 0.7,
   },
   pricingSection: {
     alignItems: 'center',
@@ -461,34 +336,9 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     marginBottom: 8,
   },
-  savings: {
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  benefitsCard: {
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  benefitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    backgroundColor: 'transparent',
-  },
-  benefitText: {
-    marginLeft: 12,
-  },
   paymentSection: {
     alignItems: 'center',
     marginBottom: 24,
-    backgroundColor: 'transparent',
-  },
-  paymentIcons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 12,
     backgroundColor: 'transparent',
   },
   secureRow: {
@@ -509,9 +359,6 @@ const styles = StyleSheet.create({
   },
   restoreButton: {
     marginBottom: 8,
-  },
-  skipButton: {
-    marginBottom: 16,
   },
   terms: {
     textAlign: 'center',
