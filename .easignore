@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Local Expo and build output
+.expo/
+.expo-shared/
+.test-build/
+coverage/
+.nyc_output/
+build/
+dist/
+out/
+.next/
+
+# Local environment files. Public EAS profile values come from eas.json.
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Generated native projects. EAS Build regenerates Android through CNG.
+/android/
+/ios/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Native and build artifacts
+*.apk
+*.aab
+*.ipa
+*.jks
+*.p12
+*.xcarchive
+local.properties
+.gradle/
+.m2/
+
+# Miscellaneous output
+*.log
+logs/
+*.tsbuildinfo
+.bundle-analyzer
+bundle-report.html
