@@ -1,10 +1,23 @@
+import { type AppTheme } from '@/app/theme';
+import {
+  AppSymbol,
+  appSymbolSource,
+  type AppSymbolName,
+} from '@/components/AppSymbol';
+import {
+  PremiumCard,
+  ScreenHeader,
+  SectionHeader,
+} from '@/components/ui';
+import { getSmokingSettings, getWeeklyBreakdown } from '@/db/queries';
 import PurchaseService, {
-  REVENUECAT_ENTITLEMENT_ID,
+  hasActivePremiumEntitlement,
 } from '@/services/purchases';
+import { URL_LINKS } from '@/utils/constants';
+import { isUserCancelledPurchaseError } from '@/utils/purchaseErrors';
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { getSmokingSettings } from '@/db/queries';
 import {
   ActivityIndicator,
   Alert,
@@ -16,119 +29,197 @@ import {
 import {
   Button,
   Divider,
-  Icon,
+  IconButton,
   Surface,
   Text,
+  TouchableRipple,
   useTheme,
 } from 'react-native-paper';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { URL_LINKS } from '@/utils/constants';
-import { isUserCancelledPurchaseError } from '@/utils/purchaseErrors';
-import {
-  PaywallBenefits,
-  PaywallFeatures,
-} from '@/components/PaywallDetails';
 
 const PAYWALL_BYPASS = Constants.expoConfig?.extra?.PAYWALL_BYPASS === 'true';
+const PREMIUM_FEATURES: {
+  icon: AppSymbolName;
+  title: string;
+  description: string;
+}[] = [
+  {
+    icon: 'lifebuoy',
+    title: 'Unlimited craving Rescue',
+    description: 'Guided three- or five-minute support whenever an urge appears.',
+  },
+  {
+    icon: 'chart-timeline-variant',
+    title: 'Month and year Progress',
+    description: 'Explore longer-term trends with responsive interactive charts.',
+  },
+  {
+    icon: 'lightbulb-on-outline',
+    title: 'Advanced pattern insights',
+    description: 'See peak smoking hours and which coping strategies help most.',
+  },
+  {
+    icon: 'file-chart-outline',
+    title: 'Weekly PDF reports',
+    description: 'Create private progress summaries entirely on your device.',
+  },
+];
+
+function packageLabel(subscriptionPackage: PurchasesPackage) {
+  const type = String(subscriptionPackage.packageType).toLowerCase();
+  if (type === 'annual') return 'Yearly';
+  if (type === 'monthly') return 'Monthly';
+  if (type === 'weekly') return 'Weekly';
+  if (type === 'three_month') return 'Three months';
+  if (type === 'six_month') return 'Six months';
+  if (type === 'lifetime') return 'Lifetime';
+  return subscriptionPackage.product.title || 'Premium';
+}
+
+function periodLabel(period: string | null) {
+  if (!period) return '';
+  const match = /^P(\d+)([DWMY])$/.exec(period);
+  if (!match) return '';
+  const amount = Number(match[1]);
+  const names: Record<string, [string, string]> = {
+    D: ['day', 'days'],
+    W: ['week', 'weeks'],
+    M: ['month', 'months'],
+    Y: ['year', 'years'],
+  };
+  const name = names[match[2]];
+  return name ? `${amount} ${amount === 1 ? name[0] : name[1]}` : '';
+}
+
 export default function SubscriptionPage() {
-  const theme = useTheme();
+  const { paywall } = useLocalSearchParams<{ paywall?: string }>();
+  const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [offeringsLoading, setOfferingsLoading] = useState(true);
+  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [subscriptionPackage, setSubscriptionPackage] =
     useState<PurchasesPackage | null>(null);
-  const [checking, setChecking] = useState(true);
+  const [weeklyTotal, setWeeklyTotal] = useState(0);
+  const [purchaseUnavailableReason, setPurchaseUnavailableReason] = useState('');
+
+  const dismissPaywall = useCallback(() => {
+    router.replace('/(tabs)/home');
+  }, []);
 
   const checkSubscription = useCallback(async () => {
     try {
       const customerInfo = await PurchaseService.getCustomerInfo();
-      setChecking(false);
-      if (
-        customerInfo &&
-        typeof customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !==
-          'undefined'
-      ) {
+      if (customerInfo && hasActivePremiumEntitlement(customerInfo)) {
         router.replace('/(tabs)/home');
       }
-    } catch {
+    } catch (error) {
+      console.error('Error checking customer information:', error);
+    } finally {
       setChecking(false);
-      // Error fetching customer info
-      Alert.alert('Error', 'Failed to fetch customer information.');
     }
   }, []);
 
   const loadOfferings = useCallback(async () => {
+    setOfferingsLoading(true);
     try {
-      const offering = await PurchaseService.getOfferings();
-      if (offering && offering.availablePackages.length > 0) {
-        // Get monthly package or first available package
-        const monthlyPackage =
-          offering.monthly || offering.availablePackages[0];
-        setSubscriptionPackage(monthlyPackage);
+      const availability = PurchaseService.getAvailability();
+      if (!availability.available) {
+        setPurchaseUnavailableReason(
+          availability.reason ??
+            'Subscriptions are temporarily unavailable. The free app remains available.',
+        );
+        setPackages([]);
+        setSubscriptionPackage(null);
+        return;
       }
+      const offering = await PurchaseService.getOfferings();
+      const available = offering?.availablePackages ?? [];
+      setPurchaseUnavailableReason('');
+      setPackages(available);
+      setSubscriptionPackage(
+        offering?.annual ?? offering?.monthly ?? available[0] ?? null,
+      );
     } catch (error) {
       console.error('Error loading offerings:', error);
+      setPackages([]);
+      setSubscriptionPackage(null);
+      setPurchaseUnavailableReason(
+        'Subscriptions are temporarily unavailable. The free app remains available.',
+      );
+    } finally {
+      setOfferingsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       if (PAYWALL_BYPASS) {
         router.replace('/(tabs)/home');
         return;
       }
-
-      // Ensure user has provided cigarettes/day and cost before showing paywall
       try {
         const settings = await getSmokingSettings();
         if (!settings) {
           router.replace('/setup-smoking');
           return;
         }
-      } catch (err) {
-        console.error('Error checking smoking settings:', err);
+        if (paywall !== 'true') {
+          router.replace('/(tabs)/home');
+          return;
+        }
+        const weekly = await getWeeklyBreakdown();
+        setWeeklyTotal(weekly.reduce((sum, value) => sum + value, 0));
+      } catch (error) {
+        console.error('Error preparing Premium screen:', error);
       }
-
-      checkSubscription();
-      loadOfferings();
+      void checkSubscription();
+      void loadOfferings();
     })();
-  }, [checkSubscription, loadOfferings]);
+  }, [checkSubscription, loadOfferings, paywall]);
 
-  const priceString = useCallback(() => {
-    if (!subscriptionPackage) return '';
-    const price = subscriptionPackage.product.priceString;
-    const period = 'monthly'; // Assuming monthly for simplicity
-    return `${price}/${period}`;
-  }, [subscriptionPackage]);
   const handleSubscribe = async () => {
     if (!subscriptionPackage) {
       Alert.alert(
-        'Not Available',
-        'Subscription packages are not available at the moment. Please try again later.',
+        'Premium is unavailable',
+        'Subscription packages could not be loaded. Please try again.',
       );
       return;
     }
-
     setLoading(true);
     try {
       const { success, customerInfo, error } =
         await PurchaseService.purchasePackage(subscriptionPackage);
-
-      if (success && customerInfo) {
-        Alert.alert('Success!', 'Welcome to Premium! 🎉', [
+      if (
+        success &&
+        customerInfo &&
+        hasActivePremiumEntitlement(customerInfo)
+      ) {
+        Alert.alert('Premium is ready', 'Welcome to Quit Smoking Premium.', [
           {
             text: 'Continue',
             onPress: () => router.replace('/(tabs)/home'),
           },
         ]);
+      } else if (success && customerInfo) {
+        Alert.alert(
+          'Purchase needs confirmation',
+          'Your store purchase completed, but Premium access has not been confirmed yet. Try Restore purchases in a moment.',
+        );
       } else if (error && !isUserCancelledPurchaseError(error)) {
         Alert.alert(
-          'Purchase Failed',
-          'Something went wrong. Please try again.',
+          'Purchase could not be completed',
+          'Nothing was charged. Please try again.',
         );
       }
-    } catch {
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } catch (error) {
+      console.error('Unexpected purchase error:', error);
+      Alert.alert(
+        'Purchase could not be completed',
+        'Nothing was charged. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -137,250 +228,590 @@ export default function SubscriptionPage() {
   const handleRestore = async () => {
     setLoading(true);
     try {
-      const { success, customerInfo } =
+      const { success, customerInfo, error } =
         await PurchaseService.restorePurchases();
-
       if (success && customerInfo) {
-        // Check if we're in mock mode
-        const isMock = PurchaseService.isMockMode();
-
-        if (isMock) {
-          // In mock mode, just show a message
+        if (PurchaseService.isMockMode()) {
           Alert.alert(
-            'Mock Mode',
-            'Running in development mode. No purchases to restore.',
+            'Development mode',
+            'No store purchases are available to restore in development mode.',
           );
+        } else if (hasActivePremiumEntitlement(customerInfo)) {
+          Alert.alert('Purchase restored', 'Quit Smoking Premium is active.', [
+            {
+              text: 'Continue',
+              onPress: () => router.replace('/(tabs)/home'),
+            },
+          ]);
         } else {
-          const hasEntitlement =
-            typeof customerInfo.entitlements?.active?.[
-              REVENUECAT_ENTITLEMENT_ID
-            ] !== 'undefined';
-
-          if (hasEntitlement) {
-            Alert.alert('Success!', 'Your purchase has been restored! 🎉', [
-              {
-                text: 'Continue',
-                onPress: () => router.replace('/(tabs)/home'),
-              },
-            ]);
-          } else {
-            Alert.alert(
-              'No Purchases Found',
-              "We couldn't find any previous purchases to restore.",
-            );
-          }
+          Alert.alert(
+            'No purchase found',
+            'We could not find an active Premium purchase for this store account.',
+          );
         }
+      } else if (error) {
+        Alert.alert('Restore unavailable', 'Please try again in a moment.');
       }
     } catch (error) {
       console.error('Restore error:', error);
-      Alert.alert('Error', 'Failed to restore purchases. Please try again.');
+      Alert.alert('Restore unavailable', 'Please try again in a moment.');
     } finally {
       setLoading(false);
     }
   };
-  // Show loading indicator while checking subscription status
+
+  const openUrl = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error('Unable to open paywall link:', error);
+      Alert.alert('Link unavailable', 'Please try again later.');
+    }
+  };
+
   if (checking) {
     return (
       <View
         style={[
-          styles.container,
           styles.loadingContainer,
           { backgroundColor: theme.colors.background },
         ]}
       >
-        <ActivityIndicator size='large' color={theme.colors.primary} />
-        <Text variant='bodyLarge' style={styles.loadingText}>
-          Checking subscription status...
+        <View
+          style={[
+            styles.loadingIcon,
+            { backgroundColor: theme.colors.primaryContainer },
+          ]}
+        >
+          <AppSymbol name='leaf' size={34} color={theme.colors.primary} />
+        </View>
+        <Text variant='headlineSmall' style={styles.loadingTitle}>
+          Quit Smoking
         </Text>
+        <ActivityIndicator color={theme.colors.primary} style={styles.spinner} />
+        <Text style={{ color: theme.colors.onSurfaceVariant }}>
+          Checking Premium access…
+        </Text>
+        <Button mode='text' onPress={dismissPaywall} style={styles.loadingSkip}>
+          Continue with free
+        </Button>
       </View>
     );
   }
-  const redirectToPrivacyPolicy = () => {
-    const url = URL_LINKS.privacy;
-    Linking.openURL(url).catch((err) =>
-      console.error('Failed to open URL:', err),
-    );
-  };
+
+  const selectedPeriod = periodLabel(
+    subscriptionPackage?.product.subscriptionPeriod ?? null,
+  );
+  const intro = subscriptionPackage?.product.introPrice;
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={[
-        styles.scrollContent,
-        { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 },
+        styles.content,
+        {
+          paddingBottom: Math.max(insets.bottom, 16) + 28,
+          paddingTop: insets.top + 8,
+        },
       ]}
     >
-      {/* Header Image */}
-      <Surface style={styles.headerImageContainer} elevation={0}>
-        <Icon source='cigar-off' size={60} color={theme.colors.primary} />
-        <Text variant='bodyLarge' style={styles.pillText}>
-          7 days completely free
+      <ScreenHeader
+        action={
+          <IconButton
+            accessibilityLabel='Close Premium screen'
+            icon={appSymbolSource('close')}
+            mode='contained-tonal'
+            onPress={dismissPaywall}
+          />
+        }
+        subtitle='Deeper support, whenever you need it.'
+        title='Quit Smoking'
+      />
+
+      <PremiumCard
+        style={[
+          styles.hero,
+          {
+            backgroundColor: theme.colors.primaryContainer,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.premiumBadge,
+            { backgroundColor: theme.appColors.premiumContainer },
+          ]}
+        >
+          <AppSymbol
+            name='crown-outline'
+            size={17}
+            color={theme.appColors.premium}
+          />
+          <Text
+            variant='labelMedium'
+            style={{ color: theme.appColors.premium, fontWeight: '700' }}
+          >
+            QUIT SMOKING PREMIUM
+          </Text>
+        </View>
+        <Text variant='headlineMedium' style={styles.heroTitle}>
+          More support when you need it most
         </Text>
-        <Text variant='headlineMedium' style={styles.title}>
-          Unlock your quit journey
+        <Text
+          variant='bodyLarge'
+          style={[styles.heroCopy, { color: theme.colors.onPrimaryContainer }]}
+        >
+          Go beyond tracking with unlimited Rescue, deeper patterns, and private progress reports.
         </Text>
-        <Text variant='bodyLarge' style={styles.subtitle}>
-          Try premium free — cancel anytime, no commitment.
-        </Text>
-      </Surface>
+        {weeklyTotal > 0 && (
+          <Surface
+            elevation={0}
+            style={[
+              styles.preview,
+              { backgroundColor: theme.colors.surface },
+            ]}
+          >
+            <View
+              style={[
+                styles.previewIcon,
+                { backgroundColor: theme.colors.secondaryContainer },
+              ]}
+            >
+              <AppSymbol
+                name='chart-timeline-variant'
+                size={22}
+                color={theme.colors.secondary}
+              />
+            </View>
+            <Text style={[styles.previewCopy, { color: theme.colors.onSurfaceVariant }]}>
+              You recorded <Text style={styles.previewStrong}>{weeklyTotal}</Text>{' '}
+              {weeklyTotal === 1 ? 'moment' : 'moments'} this week. Premium helps turn them into deeper patterns.
+            </Text>
+          </Surface>
+        )}
+      </PremiumCard>
 
-      <Divider style={styles.divider} />
+      <SectionHeader
+        title='What Premium unlocks'
+        subtitle='Free tracking, planning, and weekly basics remain available.'
+      />
+      <PremiumCard>
+        {PREMIUM_FEATURES.map((feature, index) => (
+          <View key={feature.title}>
+            {index > 0 && <Divider />}
+            <View style={styles.featureRow}>
+              <View
+                style={[
+                  styles.featureIcon,
+                  { backgroundColor: theme.appColors.premiumContainer },
+                ]}
+              >
+                <AppSymbol
+                  name={feature.icon}
+                  size={22}
+                  color={theme.appColors.premium}
+                />
+              </View>
+              <View style={styles.featureCopy}>
+                <Text variant='titleSmall' style={styles.featureTitle}>
+                  {feature.title}
+                </Text>
+                <Text
+                  variant='bodySmall'
+                  style={{
+                    color: theme.colors.onSurfaceVariant,
+                    lineHeight: 19,
+                  }}
+                >
+                  {feature.description}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ))}
+      </PremiumCard>
 
-      <PaywallFeatures />
+      <View style={styles.chooseSection}>
+        <SectionHeader
+          title='Choose your Premium access'
+          subtitle='Store pricing and renewal terms are shown exactly as provided.'
+        />
+        {offeringsLoading ? (
+          <Surface
+            elevation={0}
+            style={[
+              styles.offeringsLoading,
+              { backgroundColor: theme.colors.elevation.level1 },
+            ]}
+          >
+            <ActivityIndicator color={theme.colors.primary} />
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>
+              Loading store options…
+            </Text>
+          </Surface>
+        ) : packages.length > 0 ? (
+          <View style={styles.packages}>
+            {packages.map((item) => {
+              const selected = subscriptionPackage?.identifier === item.identifier;
+              const period = periodLabel(item.product.subscriptionPeriod);
+              return (
+                <TouchableRipple
+                  accessibilityRole='radio'
+                  accessibilityState={{ checked: selected }}
+                  borderless
+                  key={item.identifier}
+                  onPress={() => setSubscriptionPackage(item)}
+                  style={[
+                    styles.packageCard,
+                    {
+                      backgroundColor: selected
+                        ? theme.colors.primaryContainer
+                        : theme.colors.elevation.level1,
+                      borderColor: selected
+                        ? theme.colors.primary
+                        : theme.colors.outlineVariant,
+                    },
+                  ]}
+                >
+                  <View style={styles.packageContent}>
+                    <View
+                      style={[
+                        styles.radioOuter,
+                        {
+                          borderColor: selected
+                            ? theme.colors.primary
+                            : theme.colors.outline,
+                        },
+                      ]}
+                    >
+                      {selected && (
+                        <View
+                          style={[
+                            styles.radioInner,
+                            { backgroundColor: theme.colors.primary },
+                          ]}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.packageCopy}>
+                      <Text variant='titleMedium' style={styles.packageTitle}>
+                        {packageLabel(item)}
+                      </Text>
+                      {!!period && (
+                        <Text
+                          variant='bodySmall'
+                          style={{ color: theme.colors.onSurfaceVariant }}
+                        >
+                          Billed every {period}
+                        </Text>
+                      )}
+                    </View>
+                    <Text variant='titleLarge' style={styles.packagePrice}>
+                      {item.product.priceString}
+                    </Text>
+                  </View>
+                </TouchableRipple>
+              );
+            })}
+          </View>
+        ) : (
+          <Surface
+            elevation={0}
+            style={[
+              styles.offeringsUnavailable,
+              {
+                backgroundColor: theme.colors.elevation.level1,
+                borderColor: theme.colors.outlineVariant,
+              },
+            ]}
+          >
+            <AppSymbol
+              name='store-alert-outline'
+              size={24}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <View style={styles.unavailableCopy}>
+              <Text variant='titleSmall'>Store options are unavailable</Text>
+              <Text
+                variant='bodySmall'
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {purchaseUnavailableReason ||
+                  'You can continue using the free app and try again later.'}
+              </Text>
+            </View>
+            <Button compact onPress={loadOfferings}>
+              Retry
+            </Button>
+          </Surface>
+        )}
+      </View>
 
-      <Divider style={styles.divider} />
-
-      {/* Pricing Section */}
-      <Surface style={styles.pricingSection} elevation={0}>
-        <Text variant='displaySmall' style={styles.price}>
-          {priceString()}
-        </Text>
-        <Text variant='bodyMedium' style={styles.priceSubtext}>
-          after 7-day free trial
-        </Text>
-      </Surface>
-
-      <PaywallBenefits />
-
-      {/* Payment Methods */}
-      <Surface style={styles.paymentSection} elevation={0}>
-        <Surface style={styles.secureRow} elevation={0}>
-          <Icon source='lock' size={16} color={theme.colors.onSurfaceVariant} />
-          <Text variant='bodySmall' style={styles.secureText}>
-            Secure payment processing
+      {subscriptionPackage && (
+        <Surface
+          elevation={0}
+          style={[
+            styles.priceSummary,
+            {
+              backgroundColor: theme.colors.elevation.level1,
+              borderColor: theme.colors.outlineVariant,
+            },
+          ]}
+        >
+          <Text
+            variant='labelLarge'
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            {packageLabel(subscriptionPackage)} Premium
+          </Text>
+          <Text variant='displaySmall' style={styles.price}>
+            {subscriptionPackage.product.priceString}
+          </Text>
+          {!!selectedPeriod && (
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>
+              Renews every {selectedPeriod} unless cancelled.
+            </Text>
+          )}
+          {intro && (
+            <Text
+              variant='bodySmall'
+              style={[styles.intro, { color: theme.appColors.premium }]}
+            >
+              Store introductory offer: {intro.priceString} for {intro.cycles}{' '}
+              {intro.cycles === 1 ? 'period' : 'periods'}, if eligible.
+            </Text>
+          )}
+          <Text
+            variant='bodySmall'
+            style={[styles.storeCopy, { color: theme.colors.onSurfaceVariant }]}
+          >
+            Eligibility, exact renewal terms, and confirmation are shown by your app store before purchase.
           </Text>
         </Surface>
-      </Surface>
+      )}
 
-      {/* CTA Button */}
+      <PremiumCard style={styles.privacyCard}>
+        <View style={styles.privacyRow}>
+          <View
+            style={[
+              styles.privacyIcon,
+              { backgroundColor: theme.colors.primaryContainer },
+            ]}
+          >
+            <AppSymbol
+              name='shield-lock-outline'
+              size={23}
+              color={theme.colors.primary}
+            />
+          </View>
+          <View style={styles.privacyCopy}>
+            <Text variant='titleSmall' style={styles.featureTitle}>
+              Private by design
+            </Text>
+            <Text
+              variant='bodySmall'
+              style={{ color: theme.colors.onSurfaceVariant, lineHeight: 19 }}
+            >
+              Your history, Rescue sessions, plans, and reports stay on this
+              device unless you choose to export them. Google Play and
+              RevenueCat process purchase history when you subscribe.
+            </Text>
+          </View>
+        </View>
+      </PremiumCard>
+
       <Button
-        mode='contained'
-        style={styles.ctaButton}
-        contentStyle={styles.ctaButtonContent}
-        onPress={handleSubscribe}
+        contentStyle={styles.primaryContent}
+        disabled={loading || !subscriptionPackage}
         loading={loading}
-        disabled={loading}
+        mode='contained'
+        onPress={handleSubscribe}
+        style={styles.primary}
       >
-        {loading ? 'Processing...' : 'Start 7-Day Free Trial'}
+        {loading ? 'Processing…' : 'Continue with Premium'}
+      </Button>
+      <Button disabled={loading} mode='text' onPress={dismissPaywall}>
+        Not now — continue with free
+      </Button>
+      <Button disabled={loading} mode='text' onPress={handleRestore}>
+        Restore purchases
       </Button>
 
-      {/* Restore Purchase Button */}
-      <Button
-        mode='text'
-        style={styles.restoreButton}
-        textColor={theme.colors.secondary}
-        onPress={handleRestore}
-        disabled={loading}
+      <View style={styles.legalLinks}>
+        <Button compact mode='text' onPress={() => openUrl(URL_LINKS.terms)}>
+          Terms
+        </Button>
+        <Text style={{ color: theme.colors.onSurfaceVariant }}>·</Text>
+        <Button compact mode='text' onPress={() => openUrl(URL_LINKS.privacy)}>
+          Privacy
+        </Button>
+      </View>
+      <Text
+        variant='bodySmall'
+        style={[styles.legal, { color: theme.colors.onSurfaceVariant }]}
       >
-        Restore Purchase
-      </Button>
-
-      {/* privacy policy */}
-      <Button
-        mode='text'
-        style={styles.restoreButton}
-        textColor={theme.colors.secondary}
-        onPress={redirectToPrivacyPolicy}
-        disabled={loading}
-      >
-        Privacy Policy
-      </Button>
-      {/* Terms */}
-      <Text variant='bodySmall' style={styles.terms}>
-        By continuing, you agree to our Terms of Service and Privacy Policy.
-        Subscription automatically renews unless cancelled at least 24 hours
-        before the end of the trial period.
+        Your subscription is managed by your app store. Free tracking and planning remain available without a purchase.
       </Text>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  headerImageContainer: {
-    width: '100%',
-    borderRadius: 12,
+  container: { flex: 1 },
+  content: { paddingHorizontal: 20 },
+  hero: {
     overflow: 'hidden',
-    marginBottom: 24,
-    justifyContent: 'center',
+  },
+  premiumBadge: {
+    alignSelf: 'flex-start',
     alignItems: 'center',
-  },
-  title: {
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  subtitle: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  divider: {
-    marginVertical: 20,
-  },
-  pricingSection: {
-    alignItems: 'center',
-    marginBottom: 20,
-    backgroundColor: 'transparent',
-  },
-  price: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  priceSubtext: {
-    opacity: 0.7,
-    marginBottom: 8,
-  },
-  paymentSection: {
-    alignItems: 'center',
-    marginBottom: 24,
-    backgroundColor: 'transparent',
-  },
-  secureRow: {
+    borderRadius: 999,
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  secureText: {
-    marginLeft: 6,
-    opacity: 0.7,
-  },
-  ctaButton: {
-    marginBottom: 8,
-    borderRadius: 8,
-  },
-  ctaButtonContent: {
-    paddingVertical: 8,
-  },
-  restoreButton: {
-    marginBottom: 8,
-  },
-  terms: {
-    textAlign: 'center',
-    opacity: 0.6,
-    paddingHorizontal: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
+  heroTitle: {
+    fontWeight: '800',
+    letterSpacing: -0.4,
     marginTop: 16,
   },
-  pillText: {
-    marginTop: 12,
-    fontWeight: '600',
-    fontSize: 14,
-    backgroundColor: '#c8dfc9',
-    color: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+  heroCopy: {
+    lineHeight: 24,
+    marginTop: 9,
   },
+  preview: {
+    alignItems: 'center',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 11,
+    marginTop: 18,
+    padding: 13,
+    width: '100%',
+  },
+  previewIcon: {
+    alignItems: 'center',
+    borderRadius: 14,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  previewCopy: { flex: 1, lineHeight: 20 },
+  previewStrong: { fontWeight: '800' },
+  featureRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 13,
+    minHeight: 78,
+    paddingVertical: 11,
+  },
+  featureIcon: {
+    alignItems: 'center',
+    borderRadius: 15,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  featureCopy: { flex: 1, minWidth: 0 },
+  featureTitle: { fontWeight: '700', marginBottom: 3 },
+  chooseSection: { marginTop: 0 },
+  packages: { gap: 10, marginTop: 14 },
+  packageCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  packageContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 76,
+    padding: 14,
+  },
+  radioOuter: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 2,
+    height: 20,
+    justifyContent: 'center',
+    width: 20,
+  },
+  radioInner: { borderRadius: 5, height: 10, width: 10 },
+  packageCopy: { flex: 1, minWidth: 0 },
+  packageTitle: { fontWeight: '700' },
+  packagePrice: {
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
+  },
+  offeringsLoading: {
+    alignItems: 'center',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 14,
+    padding: 18,
+  },
+  offeringsUnavailable: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+    padding: 14,
+  },
+  unavailableCopy: { flex: 1, minWidth: 0 },
+  priceSummary: {
+    alignItems: 'center',
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 16,
+    padding: 18,
+  },
+  price: {
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
+    marginVertical: 4,
+  },
+  intro: { fontWeight: '700', marginTop: 9, textAlign: 'center' },
+  storeCopy: { lineHeight: 18, marginTop: 8, textAlign: 'center' },
+  privacyCard: { marginTop: 16 },
+  privacyRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  privacyIcon: {
+    alignItems: 'center',
+    borderRadius: 15,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  privacyCopy: { flex: 1, minWidth: 0 },
+  primary: { borderRadius: 999, marginTop: 20 },
+  primaryContent: { minHeight: 54 },
+  legalLinks: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  legal: { lineHeight: 18, paddingHorizontal: 12, textAlign: 'center' },
+  loadingContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  loadingIcon: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 68,
+    justifyContent: 'center',
+    width: 68,
+  },
+  loadingTitle: { fontWeight: '700', marginTop: 16 },
+  spinner: { marginBottom: 10, marginTop: 20 },
+  loadingSkip: { marginTop: 10 },
 });

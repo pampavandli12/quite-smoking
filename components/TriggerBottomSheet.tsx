@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppSymbol, type AppSymbolName } from '@/components/AppSymbol';
 import {
   Modal,
   Pressable,
@@ -14,7 +15,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import {
-  Icon,
   Surface,
   Text,
   TouchableRipple,
@@ -22,7 +22,7 @@ import {
 } from 'react-native-paper';
 
 type TriggerOption = {
-  icon: string;
+  icon: AppSymbolName;
   label: string;
   value: string;
 };
@@ -118,8 +118,8 @@ function TriggerButton({
       >
         <View style={styles.triggerContent}>
           <View style={[styles.iconBox, { backgroundColor: iconBackground }]}>
-            <Icon
-              source={option.icon}
+            <AppSymbol
+              name={option.icon}
               size={22}
               color={
                 theme.dark

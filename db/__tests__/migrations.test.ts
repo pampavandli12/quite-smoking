@@ -3,6 +3,11 @@ import {
   CREATE_INDEXES_SQL,
   CREATE_TABLES_SQL,
   DATABASE_VERSION,
+  ENSURE_PRODUCT_TABLES_SQL,
+  MIGRATION_2_SQL,
+  MIGRATION_3_SQL,
+  MIGRATION_4_SQL,
+  MIGRATION_5_SQL,
   NORMALIZE_LEGACY_TIMESTAMPS_SQL,
 } from '../migrations';
 
@@ -213,5 +218,74 @@ describe('database migration', () => {
       .join(' ');
 
     expect(plan).toContain('idx_smoking_log_timestamp_normalized');
+  });
+
+  test('additive roadmap schema preserves populated version-one data', () => {
+    database.exec(`
+      INSERT INTO smoking_log (timestamp) VALUES (1753439400000);
+      INSERT INTO smoking_log_triggers (log_id, trigger) VALUES (1, 'stress');
+      INSERT INTO user_smoking_settings (
+        cigarettes_per_day, cost_per_cigarette_cents, created_at
+      ) VALUES (10, 1500, 1753439400000);
+    `);
+
+    database.exec(MIGRATION_2_SQL);
+    database
+      .prepare(
+        `INSERT INTO app_metadata (key, value, updated_at)
+         VALUES ('legacy_access', 'true', ?)`,
+      )
+      .run(Date.now());
+    database.exec(MIGRATION_3_SQL);
+    database.exec(MIGRATION_4_SQL);
+    database.exec(MIGRATION_5_SQL);
+
+    expect(database.prepare('SELECT COUNT(*) AS count FROM smoking_log').get())
+      .toEqual({ count: 1 });
+    expect(
+      database.prepare('SELECT COUNT(*) AS count FROM smoking_log_triggers').get(),
+    ).toEqual({ count: 1 });
+    expect(
+      database.prepare('SELECT COUNT(*) AS count FROM user_smoking_settings').get(),
+    ).toEqual({ count: 1 });
+    expect(
+      database.prepare(
+        `SELECT value FROM app_metadata WHERE key = 'legacy_access'`,
+      ).get(),
+    ).toEqual({ value: 'true' });
+
+    const tables = database
+      .prepare(
+        `SELECT name FROM sqlite_master
+         WHERE type = 'table' AND name IN (
+           'craving_session', 'craving_session_strategy', 'quit_plan',
+           'plan_week', 'user_preferences', 'notification_preferences',
+           'weekly_report', 'savings_goal'
+         ) ORDER BY name`,
+      )
+      .all()
+      .map((row) => (row as { name: string }).name);
+    expect(tables).toHaveLength(8);
+  });
+
+  test('reconciles missing product tables when the version marker is ahead', () => {
+    database.exec(`PRAGMA user_version = ${DATABASE_VERSION}`);
+    database.exec(ENSURE_PRODUCT_TABLES_SQL);
+
+    const tables = database
+      .prepare(
+        `SELECT name FROM sqlite_master
+         WHERE type = 'table' AND name IN (
+           'app_metadata', 'craving_session', 'craving_session_strategy',
+           'quit_plan', 'plan_week', 'user_preferences',
+           'notification_preferences', 'weekly_report', 'savings_goal'
+         )`,
+      )
+      .all();
+
+    expect(tables).toHaveLength(9);
+    expect(database.prepare('PRAGMA user_version').get()).toEqual({
+      user_version: DATABASE_VERSION,
+    });
   });
 });

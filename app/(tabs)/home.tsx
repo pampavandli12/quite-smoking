@@ -1,351 +1,366 @@
 import {
+  deleteSmokingLog,
+  getNonSmokingStreak,
+  getSmokingSettings,
   getTodayLogs,
   getTodayStats,
   getWeeklyBreakdown,
   getYesterdayStats,
   logSmokingEvent,
-  getNonSmokingStreak,
   type SmokingLogTimestampRow,
 } from '@/db';
 import TriggerBottomSheet from '@/components/TriggerBottomSheet';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { AppSymbol, appSymbolSource } from '@/components/AppSymbol';
+import {
+  AnimatedNumber,
+  MetricCard,
+  PremiumCard,
+  ProgressRing,
+  ScreenContainer,
+  ScreenHeader,
+  SectionHeader,
+} from '@/components/ui';
+import { getActiveQuitPlan } from '@/services/quitPlanService';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Button,
-  Card,
-  Icon,
-  Surface,
+  Snackbar,
   Text,
   useTheme,
 } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-function formatSmokingLogTime(log: SmokingLogTimestampRow) {
-  return new Date(log.timestamp).toLocaleTimeString('en-US', {
+type HomeSnapshot = {
+  today: number;
+  yesterday: number;
+  logs: SmokingLogTimestampRow[];
+  weekly: number[];
+  streak: number;
+  dailyTarget: number;
+  moneySaved: number;
+};
+
+const initialSnapshot: HomeSnapshot = {
+  today: 0,
+  yesterday: 0,
+  logs: [],
+  weekly: [0, 0, 0, 0, 0, 0, 0],
+  streak: 0,
+  dailyTarget: 0,
+  moneySaved: 0,
+};
+
+function timeLabel(timestamp: number | string) {
+  return new Date(timestamp).toLocaleTimeString([], {
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
   });
-}
-
-function formatCigaretteCount(count: number) {
-  return `${count} ${count === 1 ? 'cigarette' : 'cigarettes'}`;
 }
 
 export default function HomePage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const [todayCount, setTodayCount] = useState(0);
-  const [yesterdayCount, setYesterdayCount] = useState(0);
-  const [todayLogs, setTodayLogs] = useState<SmokingLogTimestampRow[]>([]);
-  const [weeklyData, setWeeklyData] = useState([0, 0, 0, 0, 0, 0, 0]);
-  const [streak, setStreak] = useState(0);
+  const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState(false);
-  const [isTriggerSheetVisible, setIsTriggerSheetVisible] = useState(false);
-  const weeklyTotal = useMemo(
-    () => weeklyData.reduce((total, count) => total + count, 0),
-    [weeklyData],
-  );
-  const weeklyAverage =
-    weeklyData.length > 0 ? Math.round(weeklyTotal / 7) : 0;
+  const [triggerVisible, setTriggerVisible] = useState(false);
+  const [undoLogId, setUndoLogId] = useState<number>();
 
-  // Load data from database
-  const loadStats = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [today, yesterday, logs, weekly, streakDays] = await Promise.all([
-        getTodayStats(),
-        getYesterdayStats(),
-        getTodayLogs(),
-        getWeeklyBreakdown(),
-        getNonSmokingStreak(),
-      ]);
-
-      setTodayCount(today);
-      setYesterdayCount(yesterday);
-      setTodayLogs(logs);
-      setWeeklyData(weekly);
-      setStreak(streakDays);
+      const [today, yesterday, logs, weekly, streak, settings, plan] =
+        await Promise.all([
+          getTodayStats(),
+          getYesterdayStats(),
+          getTodayLogs(),
+          getWeeklyBreakdown(),
+          getNonSmokingStreak(),
+          getSmokingSettings(),
+          getActiveQuitPlan(),
+        ]);
+      const dailyTarget =
+        plan?.currentDailyTarget ?? settings?.cigarettesPerDay ?? 0;
+      const avoided = Math.max(0, dailyTarget - today);
+      setSnapshot({
+        today,
+        yesterday,
+        logs,
+        weekly,
+        streak,
+        dailyTarget,
+        moneySaved: avoided * ((settings?.costPerCigaretteCents ?? 0) / 100),
+      });
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error('Error loading Home:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const handleTriggerSelect = useCallback(
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+
+  const weeklyTotal = useMemo(
+    () => snapshot.weekly.reduce((sum, value) => sum + value, 0),
+    [snapshot.weekly],
+  );
+  const progress =
+    snapshot.dailyTarget > 0
+      ? snapshot.today / snapshot.dailyTarget
+      : snapshot.today > 0
+        ? 1
+        : 0;
+  const supportiveCopy =
+    snapshot.today === 0
+      ? 'A fresh day. Take it one choice at a time.'
+      : snapshot.dailyTarget > 0 && snapshot.today <= snapshot.dailyTarget
+        ? 'You are still within today’s plan.'
+        : 'Recorded without judgment. Your plan continues.';
+
+  const handleLog = useCallback(
     async (trigger?: string) => {
       try {
         setLogging(true);
         const result = await logSmokingEvent(trigger ? [trigger] : []);
-
         if (result.success) {
-          setIsTriggerSheetVisible(false); // Reset streak to 0 when logging a cigarette
-          setStreak(0);
-          await loadStats();
+          setUndoLogId(result.logId);
+          setTriggerVisible(false);
+          await load();
         }
-      } catch (error) {
-        console.error('Error logging smoking event:', error);
       } finally {
         setLogging(false);
       }
     },
-    [loadStats],
+    [load],
   );
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
-
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      contentContainerStyle={{
-        paddingTop: insets.top,
-        paddingBottom: 32,
-      }}
-    >
-      <Surface style={styles.content} elevation={0}>
-        {/* Header */}
-        <Surface style={styles.header} elevation={0}>
-          <Text variant='headlineSmall' style={styles.headerTitle}>
-            Smoke Track
-          </Text>
-        </Surface>
+    <>
+      <ScreenContainer>
+        <ScreenHeader
+          title='Today'
+          subtitle={new Date().toLocaleDateString([], {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+          })}
+          action={
+            <View style={[styles.avatar, { backgroundColor: theme.colors.primaryContainer }]}>
+              <AppSymbol name='leaf' size={22} color={theme.colors.primary} />
+            </View>
+          }
+        />
 
-        {/* Today's Count Card */}
-
-        <Card style={styles.todayCard}>
-          <Card.Content>
-            <Surface style={styles.todayContent} elevation={0}>
-              <Surface style={styles.todayLeft} elevation={0}>
-                <Text variant='bodyMedium' style={styles.todayLabel}>
-                  Today&apos;s Count
+        <Animated.View entering={FadeInDown.duration(260)}>
+          <PremiumCard
+            style={[
+              styles.hero,
+              { backgroundColor: theme.colors.primaryContainer },
+            ]}
+          >
+            <View style={styles.heroRow}>
+              <ProgressRing
+                progress={progress}
+                size={126}
+                accessibilityLabel={`${snapshot.today} of ${snapshot.dailyTarget || 'no'} daily target`}
+              >
+                <Text variant='displaySmall' style={styles.heroNumber}>
+                  <AnimatedNumber value={snapshot.today} />
                 </Text>
-
-                <Text variant='displaySmall' style={styles.todayCount}>
-                  {todayCount}
+                <Text variant='labelMedium'>
+                  of {snapshot.dailyTarget || '—'}
                 </Text>
-              </Surface>
-            </Surface>
-          </Card.Content>
-        </Card>
-
-        {/* Streak card */}
-        <Card style={styles.streakCard}>
-          <Card.Content>
-            <View
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
-            >
-              <Icon source='fire' size={40} color={theme.colors.primary} />
-              <View>
-                <Text variant='titleMedium' style={styles.streakLabel}>
-                  Current Streak
+              </ProgressRing>
+              <View style={styles.heroCopy}>
+                <Text variant='titleLarge' style={styles.heroTitle}>
+                  Your daily rhythm
                 </Text>
-                <Text variant='displaySmall' style={styles.streakCount}>
-                  {streak}
+                <Text
+                  variant='bodyMedium'
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                >
+                  {supportiveCopy}
                 </Text>
-                <Text variant='bodySmall' style={{ opacity: 0.7 }}>
-                  {streak} day{streak !== 1 ? 's' : ''} smoke-free
-                </Text>
+                <View style={styles.smokeFreeRow}>
+                  <AppSymbol
+                    name='weather-sunset-up'
+                    size={18}
+                    color={theme.colors.primary}
+                  />
+                  <Text variant='labelLarge'>
+                    {snapshot.streak} smoke-free day{snapshot.streak === 1 ? '' : 's'}
+                  </Text>
+                </View>
               </View>
             </View>
-          </Card.Content>
-        </Card>
+          </PremiumCard>
+        </Animated.View>
 
-        {/* Log Smoking Button */}
-        <Button
-          mode='contained'
-          style={styles.logButton}
-          contentStyle={styles.logButtonContent}
-          icon='plus'
-          onPress={() => setIsTriggerSheetVisible(true)}
-          loading={loading || logging}
-          disabled={loading || logging}
-        >
-          Log Smoking
-        </Button>
+        <View style={styles.actions}>
+          <Button
+            mode='contained'
+            icon={appSymbolSource('lifebuoy')}
+            style={styles.action}
+            contentStyle={styles.actionContent}
+            onPress={() => router.push('/(tabs)/rescue')}
+          >
+            I&apos;m craving
+          </Button>
+          <Button
+            mode='outlined'
+            icon={appSymbolSource('plus')}
+            style={styles.action}
+            contentStyle={styles.actionContent}
+            loading={logging}
+            disabled={loading || logging}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setTriggerVisible(true);
+            }}
+          >
+            I smoked
+          </Button>
+        </View>
 
-        {/* Detailed Statistics */}
-        <Surface style={styles.section} elevation={0}>
-          <Text variant='titleLarge' style={styles.sectionTitle}>
-            Detailed Statistics
-          </Text>
+        <View style={styles.metrics}>
+          <MetricCard
+            label='Current streak'
+            value={snapshot.streak}
+            unit='days'
+            icon='fire'
+            tone='success'
+            accessibilityLabel={`${snapshot.streak} day smoke-free streak`}
+          />
+          <MetricCard
+            label='Saved today'
+            value={`₹${Math.round(snapshot.moneySaved)}`}
+            icon='wallet-outline'
+            tone='success'
+            accessibilityLabel={`${Math.round(snapshot.moneySaved)} rupees saved today`}
+          />
+        </View>
 
-          <Card style={styles.statCard}>
-            <Card.Content>
-              <Surface style={styles.statRow} elevation={0}>
-                <Text variant='titleMedium'>Today</Text>
-                <Text variant='titleMedium' style={styles.countText}>
-                  {formatCigaretteCount(todayCount)}
-                </Text>
-              </Surface>
-              {todayLogs.length > 0 && (
-                <Surface style={styles.timeRow} elevation={0}>
-                  <Icon
-                    source='clock-outline'
-                    size={16}
+        <SectionHeader
+          title='Recent activity'
+          subtitle='Your latest recorded moments'
+          action={<Button compact onPress={() => router.push('/history')}>History</Button>}
+        />
+        <PremiumCard>
+          {snapshot.logs.length === 0 ? (
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>
+              Nothing recorded today. Your activity will appear here.
+            </Text>
+          ) : (
+            snapshot.logs.slice(-3).reverse().map((log, index) => (
+              <View
+                key={log.id}
+                style={[
+                  styles.activityRow,
+                  index > 0 && { borderTopColor: theme.colors.outlineVariant, borderTopWidth: StyleSheet.hairlineWidth },
+                ]}
+              >
+                <View style={[styles.activityIcon, { backgroundColor: theme.colors.surfaceVariant }]}>
+                  <AppSymbol
+                    name='clock-outline'
+                    size={18}
                     color={theme.colors.onSurfaceVariant}
                   />
-                  <Text variant='bodySmall' style={styles.timeText}>
-                    {todayLogs.map(formatSmokingLogTime).join(', ')}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant='titleSmall'>Cigarette recorded</Text>
+                  <Text variant='bodySmall' style={{ color: theme.colors.onSurfaceVariant }}>
+                    {timeLabel(log.timestamp)}
                   </Text>
-                </Surface>
-              )}
-            </Card.Content>
-          </Card>
+                </View>
+              </View>
+            ))
+          )}
+        </PremiumCard>
 
-          <Card style={styles.statCard}>
-            <Card.Content>
-              <Surface style={styles.statRow} elevation={0}>
-                <Text variant='titleMedium'>Yesterday</Text>
-                <Text variant='titleMedium' style={styles.countText}>
-                  {formatCigaretteCount(yesterdayCount)}
-                </Text>
-              </Surface>
-            </Card.Content>
-          </Card>
-        </Surface>
+        <SectionHeader title='This week' subtitle='A gentle view of your pattern' />
+        <PremiumCard>
+          <View style={styles.insightRow}>
+            <View>
+              <Text variant='displaySmall' style={styles.insightNumber}>{weeklyTotal}</Text>
+              <Text style={{ color: theme.colors.onSurfaceVariant }}>recorded this week</Text>
+            </View>
+            <View style={[styles.insightIcon, { backgroundColor: theme.colors.secondaryContainer }]}>
+              <AppSymbol
+                name='chart-timeline-variant'
+                size={26}
+                color={theme.colors.secondary}
+              />
+            </View>
+          </View>
+          <Button mode='text' onPress={() => router.push('/(tabs)/stats')}>
+            Explore your progress
+          </Button>
+        </PremiumCard>
+      </ScreenContainer>
 
-        {/* Weekly Insights */}
-        <Surface style={styles.section} elevation={0}>
-          <Text variant='titleLarge' style={styles.sectionTitle}>
-            Weekly Insights
-          </Text>
-
-          <Surface style={styles.insightItem} elevation={0}>
-            <Icon source='chart-line' size={20} color={theme.colors.primary} />
-            <Text variant='bodyMedium' style={styles.insightText}>
-              Average: {weeklyAverage} cigarettes per day
-            </Text>
-          </Surface>
-
-          <Surface style={styles.insightItem} elevation={0}>
-            <Icon
-              source='calendar-week'
-              size={20}
-              color={theme.colors.primary}
-            />
-            <Text variant='bodyMedium' style={styles.insightText}>
-              Total this week: {weeklyTotal} cigarettes
-            </Text>
-          </Surface>
-
-          <Surface style={styles.insightItem} elevation={0}>
-            <Icon source='information' size={20} color='#4285F4' />
-            <Text variant='bodyMedium' style={styles.insightText}>
-              Track your progress by logging each cigarette
-            </Text>
-          </Surface>
-        </Surface>
-      </Surface>
       <TriggerBottomSheet
         loading={logging}
-        onDismiss={() => setIsTriggerSheetVisible(false)}
-        onSelect={handleTriggerSelect}
-        visible={isTriggerSheetVisible}
+        visible={triggerVisible}
+        onDismiss={() => setTriggerVisible(false)}
+        onSelect={handleLog}
       />
-    </ScrollView>
+      <Snackbar
+        visible={typeof undoLogId === 'number'}
+        duration={5000}
+        onDismiss={() => setUndoLogId(undefined)}
+        style={styles.snackbar}
+        wrapperStyle={[
+          styles.snackbarWrapper,
+          { bottom: Math.max(insets.bottom, 12) + 74 },
+        ]}
+        action={{
+          label: 'Undo',
+          onPress: async () => {
+            if (undoLogId) {
+              await deleteSmokingLog(undoLogId);
+              setUndoLogId(undefined);
+              await load();
+            }
+          },
+        }}
+      >
+        Recorded without judgment. Your plan continues.
+      </Snackbar>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  hero: { overflow: 'hidden' },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  heroNumber: { fontWeight: '800', fontVariant: ['tabular-nums'] },
+  heroCopy: { flex: 1, gap: 8 },
+  heroTitle: { fontWeight: '700' },
+  smokeFreeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 18 },
+  action: { flex: 1, borderRadius: 14 },
+  actionContent: { minHeight: 52 },
+  metrics: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  activityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  activityIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  insightRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  insightNumber: { fontWeight: '800' },
+  insightIcon: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  snackbar: {
+    borderRadius: 16,
   },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-    backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    backgroundColor: 'transparent',
-  },
-  headerTitle: {
-    fontWeight: '600',
-  },
-  todayCard: {
-    marginBottom: 16,
-  },
-  todayContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  todayLeft: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  todayLabel: {
-    marginBottom: 8,
-    opacity: 0.7,
-  },
-  todayCount: {
-    fontWeight: 'bold',
-    color: '#4285F4',
-  },
-  logButton: {
-    marginBottom: 16,
-    borderRadius: 8,
-  },
-  logButtonContent: {
-    paddingVertical: 6,
-  },
-  section: {
-    marginBottom: 24,
-    backgroundColor: 'transparent',
-  },
-  sectionTitle: {
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  statCard: {
-    marginBottom: 12,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-  },
-  countText: {
-    color: '#4285F4',
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'transparent',
-  },
-  timeText: {
-    opacity: 0.7,
-    flex: 1,
-  },
-  insightItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-    backgroundColor: 'transparent',
-  },
-  insightText: {
-    flex: 1,
-  },
-  streakCard: {
-    marginBottom: 16,
-  },
-  streakLabel: {
-    marginBottom: 8,
-    opacity: 0.7,
-  },
-  streakCount: {
-    fontWeight: 'bold',
+  snackbarWrapper: {
+    elevation: 24,
+    zIndex: 100,
   },
 });

@@ -46,6 +46,7 @@ expo-env.d.ts
 dist/
 
 # React Native
+/android/
 android/app/debug/
 android/app/release/
 ios/Pods/

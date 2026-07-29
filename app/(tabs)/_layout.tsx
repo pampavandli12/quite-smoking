@@ -1,5 +1,5 @@
 import CustomTabBar from '@/components/CustomTabBar';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { AppSymbol } from '@/components/AppSymbol';
 import { Tabs } from 'expo-router';
 import { useTheme } from 'react-native-paper';
 
@@ -12,11 +12,7 @@ function HomeIcon({
   size: number;
   focused: boolean;
 }) {
-  return focused ? (
-    <Ionicons name='home' size={size} color={color} />
-  ) : (
-    <Ionicons name='home-outline' size={size} color={color} />
-  );
+  return <AppSymbol name='home' size={size} color={color} filled={focused} />;
 }
 
 function StatsIcon({
@@ -28,11 +24,7 @@ function StatsIcon({
   size: number;
   focused: boolean;
 }) {
-  return focused ? (
-    <Ionicons name='stats-chart' size={size} color={color} />
-  ) : (
-    <Ionicons name='stats-chart-outline' size={size} color={color} />
-  );
+  return <AppSymbol name='stats' size={size} color={color} filled={focused} />;
 }
 
 export default function TabLayout() {
@@ -63,9 +55,39 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name='rescue'
+        options={{
+          title: 'Rescue',
+          headerShown: false,
+          tabBarIcon: ({ color, size, focused }) => (
+            <AppSymbol
+              name='lifebuoy'
+              size={size}
+              color={color}
+              filled={focused}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name='plan'
+        options={{
+          title: 'Plan',
+          headerShown: false,
+          tabBarIcon: ({ color, size, focused }) => (
+            <AppSymbol
+              name='calendar-check'
+              size={size}
+              color={color}
+              filled={focused}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name='stats'
         options={{
-          title: 'Stats',
+          title: 'Progress',
           headerShown: false,
           tabBarIcon: StatsIcon,
         }}
@@ -76,10 +98,11 @@ export default function TabLayout() {
           title: 'Settings',
           headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'cog' : 'cog-outline'}
+            <AppSymbol
+              name='settings'
               size={size}
               color={color}
+              filled={focused}
             />
           ),
         }}

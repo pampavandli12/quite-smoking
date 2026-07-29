@@ -9,8 +9,9 @@ import * as schema from './schema';
 import {
   CREATE_INDEXES_SQL,
   CREATE_TABLES_SQL,
+  DATABASE_MIGRATIONS,
   DATABASE_VERSION,
-  NORMALIZE_LEGACY_TIMESTAMPS_SQL,
+  ENSURE_PRODUCT_TABLES_SQL,
 } from './migrations';
 
 export const expoDb = openDatabaseSync('quitSmoking.db');
@@ -72,6 +73,27 @@ export function dbTransactionAsync<T>(
   });
 }
 
+async function ensureProductSchema() {
+  await dbExecAsync(ENSURE_PRODUCT_TABLES_SQL);
+  const columns = await dbGetAllAsync<{ name: string }>(
+    `PRAGMA table_info(smoking_log)`,
+  );
+  const columnNames = new Set(columns.map((column) => column.name));
+
+  if (!columnNames.has('note')) {
+    await dbExecAsync(`ALTER TABLE smoking_log ADD COLUMN note TEXT`);
+  }
+  if (!columnNames.has('updated_at')) {
+    await dbExecAsync(`ALTER TABLE smoking_log ADD COLUMN updated_at INTEGER`);
+  }
+  if (!columnNames.has('source')) {
+    await dbExecAsync(
+      `ALTER TABLE smoking_log
+       ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`,
+    );
+  }
+}
+
 // Initialize database tables
 export async function initializeDatabase() {
   try {
@@ -82,11 +104,40 @@ export async function initializeDatabase() {
     );
     const currentVersion = versionRow?.userVersion ?? 0;
 
-    if (currentVersion < DATABASE_VERSION) {
+    for (const migration of DATABASE_MIGRATIONS) {
+      if (migration.version <= currentVersion) {
+        continue;
+      }
       await dbTransactionAsync(async (transaction) => {
-        await transaction.execAsync(NORMALIZE_LEGACY_TIMESTAMPS_SQL);
-        await transaction.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+        await migration.migrate(transaction);
+        await transaction.execAsync(
+          `PRAGMA user_version = ${migration.version}`,
+        );
       });
+    }
+
+    const metadataTable = await dbGetFirstAsync<{ name: string }>(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'table' AND name = 'app_metadata'`,
+    );
+
+    // Development hot reloads and interrupted historical builds may leave a
+    // version marker ahead of the additive schema. Reconcile safely without
+    // modifying existing smoking data.
+    await ensureProductSchema();
+    if (currentVersion >= 2 && !metadataTable) {
+      const existing = await dbGetFirstAsync<{ count: number }>(`
+        SELECT
+          (SELECT COUNT(*) FROM smoking_log) +
+          (SELECT COUNT(*) FROM user_smoking_settings) AS count
+      `);
+      if ((existing?.count ?? 0) > 0) {
+        await dbRunAsync(
+          `INSERT OR IGNORE INTO app_metadata (key, value, updated_at)
+           VALUES ('legacy_access', 'true', ?)`,
+          [Date.now()],
+        );
+      }
     }
 
     try {

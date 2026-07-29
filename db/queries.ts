@@ -195,7 +195,7 @@ export async function getAllSmokingLogs(): Promise<0 | SmokingLogRow[]> {
     if (!validLogs || validLogs.length === 0) {
       return 0;
     }
-    return logs;
+    return validLogs;
   } catch (error) {
     console.error('Error fetching smoking logs:', error);
     return [];

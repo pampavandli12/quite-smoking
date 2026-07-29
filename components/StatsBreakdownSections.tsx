@@ -1,61 +1,108 @@
 import type { TriggerCountRow } from '@/db';
 import type { DetailedWeeklyBreakdownItem } from '@/utils/statistics';
+import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Card, Surface, Text } from 'react-native-paper';
+import { Card, Surface, Text, useTheme } from 'react-native-paper';
 
 type TopTriggersSectionProps = {
   triggers: TriggerCountRow[];
 };
 
-export function TopTriggersSection({ triggers }: TopTriggersSectionProps) {
-  if (triggers.length === 0) {
-    return null;
-  }
+function SectionCard({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  return (
+    <Card
+      mode='contained'
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.colors.elevation.level1,
+          borderColor: theme.colors.outlineVariant,
+        },
+      ]}
+    >
+      <Card.Content>{children}</Card.Content>
+    </Card>
+  );
+}
 
-  const maximumCount = triggers[0]?.count || 1;
+export function TopTriggersSection({ triggers }: TopTriggersSectionProps) {
+  const theme = useTheme();
+  if (triggers.length === 0) return null;
+  const maximumCount = Math.max(1, ...triggers.map((item) => item.count));
 
   return (
-    <Surface style={styles.section} elevation={0}>
+    <View style={styles.section}>
       <Text variant='titleLarge' style={styles.sectionTitle}>
-        Top Triggers
+        Top triggers
       </Text>
-      <Text variant='bodyMedium' style={styles.sectionSubtitle}>
-        What makes you reach for a cigarette
+      <Text
+        variant='bodyMedium'
+        style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}
+      >
+        Patterns around your recorded moments
       </Text>
-
-      {triggers.map((item, index) => (
-        <Card key={item.trigger} style={styles.triggerCard}>
-          <Card.Content style={styles.triggerCardContent}>
-            <Surface style={styles.triggerLeft} elevation={0}>
-              <Surface style={styles.triggerRank} elevation={0}>
-                <Text variant='bodyMedium' style={styles.triggerRankText}>
-                  {index + 1}
-                </Text>
-              </Surface>
-              <Text variant='bodyLarge' style={styles.triggerName}>
-                {item.trigger}
+      <SectionCard>
+        {triggers.map((item, index) => (
+          <View
+            accessible
+            accessibilityLabel={`${item.trigger}, ${item.count} recorded ${
+              item.count === 1 ? 'time' : 'times'
+            }`}
+            key={item.trigger}
+            style={[
+              styles.row,
+              index > 0 && {
+                borderTopColor: theme.colors.outlineVariant,
+                borderTopWidth: StyleSheet.hairlineWidth,
+              },
+            ]}
+          >
+            <Surface
+              style={[
+                styles.rank,
+                { backgroundColor: theme.colors.secondaryContainer },
+              ]}
+              elevation={0}
+            >
+              <Text
+                variant='labelLarge'
+                style={{ color: theme.colors.onSecondaryContainer, fontWeight: '700' }}
+              >
+                {index + 1}
               </Text>
             </Surface>
-            <Surface style={styles.triggerRight} elevation={0}>
-              <Surface
-                style={styles.triggerProgressBarContainer}
-                elevation={0}
+            <View style={styles.rowCopy}>
+              <Text variant='titleSmall' style={styles.capitalize}>
+                {item.trigger}
+              </Text>
+              <View
+                style={[
+                  styles.track,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ]}
               >
                 <View
                   style={[
-                    styles.triggerProgressBarFilled,
-                    { width: `${(item.count / maximumCount) * 100}%` },
+                    styles.fill,
+                    {
+                      backgroundColor: theme.colors.secondary,
+                      width: `${Math.min(100, (item.count / maximumCount) * 100)}%`,
+                    },
                   ]}
                 />
-              </Surface>
-              <Text variant='titleMedium' style={styles.triggerCount}>
-                {item.count}
-              </Text>
-            </Surface>
-          </Card.Content>
-        </Card>
-      ))}
-    </Surface>
+              </View>
+            </View>
+            <Text
+              variant='titleMedium'
+              style={[styles.count, { color: theme.colors.primary }]}
+            >
+              {item.count}
+            </Text>
+          </View>
+        ))}
+      </SectionCard>
+    </View>
   );
 }
 
@@ -66,159 +113,129 @@ type DailyBreakdownSectionProps = {
 export function DailyBreakdownSection({
   breakdown,
 }: DailyBreakdownSectionProps) {
-  if (breakdown.length === 0) {
-    return null;
-  }
+  const theme = useTheme();
+  if (breakdown.length === 0) return null;
 
   return (
-    <Surface style={styles.section} elevation={0}>
+    <View style={styles.section}>
       <Text variant='titleLarge' style={styles.sectionTitle}>
-        Daily Breakdown
+        Daily breakdown
       </Text>
-
-      {breakdown.map((item) => (
-        <Card key={item.date} style={styles.dayCard}>
-          <Card.Content style={styles.dayCardContent}>
-            <Surface style={styles.dayLeft} elevation={0}>
-              <Text variant='bodyLarge' style={styles.dayName}>
-                {item.day}
-              </Text>
-              <Text variant='bodySmall' style={styles.dayDate}>
+      <Text
+        variant='bodyMedium'
+        style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}
+      >
+        A day-by-day view of this week
+      </Text>
+      <SectionCard>
+        {breakdown.map((item, index) => (
+          <View
+            accessible
+            accessibilityLabel={`${item.day}, ${item.date}, ${item.count} ${
+              item.count === 1 ? 'cigarette' : 'cigarettes'
+            }`}
+            key={item.date}
+            style={[
+              styles.row,
+              index > 0 && {
+                borderTopColor: theme.colors.outlineVariant,
+                borderTopWidth: StyleSheet.hairlineWidth,
+              },
+            ]}
+          >
+            <View style={styles.dayCopy}>
+              <Text variant='titleSmall'>{item.day}</Text>
+              <Text variant='bodySmall' style={{ color: theme.colors.onSurfaceVariant }}>
                 {item.date}
               </Text>
-            </Surface>
-            <Surface style={styles.dayRight} elevation={0}>
-              <Surface style={styles.progressBarContainer} elevation={0}>
+            </View>
+            <View style={styles.dayTrack}>
+              <View
+                style={[
+                  styles.track,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ]}
+              >
                 <View
                   style={[
-                    styles.progressBarFilled,
-                    { width: `${item.progress * 100}%` },
+                    styles.fill,
+                    {
+                      backgroundColor: theme.colors.secondary,
+                      width: `${Math.min(100, Math.max(0, item.progress * 100))}%`,
+                    },
                   ]}
                 />
-              </Surface>
-              <Text variant='titleMedium' style={styles.dayCount}>
-                {item.count}
-              </Text>
-            </Surface>
-          </Card.Content>
-        </Card>
-      ))}
-    </Surface>
+              </View>
+            </View>
+            <Text variant='titleMedium' style={styles.count}>
+              {item.count}
+            </Text>
+          </View>
+        ))}
+      </SectionCard>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
-    backgroundColor: 'transparent',
   },
   sectionTitle: {
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '700',
   },
   sectionSubtitle: {
-    opacity: 0.6,
-    marginBottom: 16,
-  },
-  triggerCard: {
     marginBottom: 12,
+    marginTop: 3,
   },
-  triggerCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
+  card: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
-  triggerLeft: {
-    flexDirection: 'row',
+  row: {
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 12,
-    flex: 1,
-    backgroundColor: 'transparent',
+    minHeight: 64,
+    paddingVertical: 10,
   },
-  triggerRank: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
+  rank: {
     alignItems: 'center',
+    borderRadius: 16,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
   },
-  triggerRankText: {
-    color: '#4285F4',
-    fontWeight: '600',
+  rowCopy: {
+    flex: 1,
+    gap: 7,
+    minWidth: 0,
   },
-  triggerName: {
-    fontWeight: '500',
+  capitalize: {
     textTransform: 'capitalize',
   },
-  triggerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  triggerProgressBarContainer: {
-    flex: 1,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E8E8E8',
+  track: {
+    borderRadius: 999,
+    height: 8,
     overflow: 'hidden',
+    width: '100%',
   },
-  triggerProgressBarFilled: {
+  fill: {
+    borderRadius: 999,
     height: '100%',
-    backgroundColor: '#4285F4',
-    borderRadius: 6,
   },
-  triggerCount: {
-    fontWeight: '600',
-    minWidth: 30,
+  count: {
+    fontVariant: ['tabular-nums'],
+    fontWeight: '700',
+    minWidth: 28,
     textAlign: 'right',
-    color: '#4285F4',
   },
-  dayCard: {
-    marginBottom: 12,
+  dayCopy: {
+    width: 92,
   },
-  dayCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  dayLeft: {
+  dayTrack: {
     flex: 1,
-    backgroundColor: 'transparent',
-  },
-  dayName: {
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  dayDate: {
-    opacity: 0.6,
-  },
-  dayRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1.8,
-    backgroundColor: 'transparent',
-  },
-  progressBarContainer: {
-    flex: 1,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E8E8E8',
-    overflow: 'hidden',
-  },
-  progressBarFilled: {
-    height: '100%',
-    backgroundColor: '#4285F4',
-    borderRadius: 6,
-  },
-  dayCount: {
-    fontWeight: '600',
-    minWidth: 30,
-    textAlign: 'right',
+    minWidth: 48,
   },
 });

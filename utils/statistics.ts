@@ -94,21 +94,25 @@ export function getSavings(
     return { cigarettesSaved: 0, moneySaved: 0 };
   }
 
-  let periodDays: number;
+  let elapsedDays: number;
 
   if (period === 'week') {
-    periodDays = 7;
+    elapsedDays = today.getDay() + 1;
   } else if (period === 'month') {
-    periodDays = new Date(
-      today.getFullYear(),
-      today.getMonth() + 1,
-      0,
-    ).getDate();
+    elapsedDays = today.getDate();
   } else {
-    periodDays = 365;
+    const currentDateUtc = Date.UTC(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+    const yearStartUtc = Date.UTC(today.getFullYear(), 0, 1);
+    elapsedDays =
+      Math.floor((currentDateUtc - yearStartUtc) / 86_400_000) + 1;
   }
 
-  const cigarettesSaved = baseline.cigarettesPerDay * periodDays - currentTotal;
+  const cigarettesSaved =
+    baseline.cigarettesPerDay * elapsedDays - currentTotal;
   const moneySaved = Math.round(
     (cigarettesSaved * baseline.costPerCigaretteCents) / 100,
   );

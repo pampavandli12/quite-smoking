@@ -8,7 +8,8 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, useColorScheme, View } from "react-native";
-import { Button, Icon, PaperProvider, Text } from "react-native-paper";
+import { Button, PaperProvider, Text } from "react-native-paper";
+import { AppSymbol, appSymbolSource } from "../components/AppSymbol";
 import { initializeDatabase } from "../db/client";
 import PurchaseService from "../services/purchases";
 import { darkTheme, lightTheme } from "./theme";
@@ -79,7 +80,37 @@ export default function RootLayout() {
   }, [databaseStatus, fontsLoaded, purchasesInitialized]);
 
   if (!fontsLoaded || databaseStatus === "loading" || !purchasesInitialized) {
-    return null;
+    return (
+      <PaperProvider theme={theme}>
+        <View
+          style={[
+            styles.startupContainer,
+            { backgroundColor: theme.colors.background },
+          ]}
+        >
+          <View
+            style={[
+              styles.startupIcon,
+              { backgroundColor: theme.colors.primaryContainer },
+            ]}
+          >
+            <AppSymbol name="leaf" size={42} color={theme.colors.primary} />
+          </View>
+          <Text
+            variant="headlineSmall"
+            style={[styles.startupTitle, { color: theme.colors.onBackground }]}
+          >
+            Quit Smoking
+          </Text>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            Preparing your private space…
+          </Text>
+        </View>
+      </PaperProvider>
+    );
   }
 
   if (databaseStatus === "failed") {
@@ -91,8 +122,8 @@ export default function RootLayout() {
             { backgroundColor: theme.colors.background },
           ]}
         >
-          <Icon
-            source="database-alert"
+          <AppSymbol
+            name="database-alert"
             size={48}
             color={theme.colors.error}
           />
@@ -114,7 +145,7 @@ export default function RootLayout() {
           </Text>
           <Button
             mode="contained"
-            icon="refresh"
+            icon={appSymbolSource("refresh")}
             onPress={setupDatabase}
             style={styles.retryButton}
           >
@@ -139,12 +170,30 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="history" />
       </Stack>
     </PaperProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  startupContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  startupIcon: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 76,
+    justifyContent: "center",
+    width: 76,
+  },
+  startupTitle: {
+    fontWeight: "700",
+    marginBottom: 6,
+    marginTop: 18,
+  },
   errorContainer: {
     flex: 1,
     alignItems: "center",

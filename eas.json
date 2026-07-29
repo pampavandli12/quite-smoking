@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "test_rGcJzBvPICvxCewJbeUyPjmGKeO",
         "PAYWALL_BYPASS": "true"
       }
     },
@@ -18,12 +19,14 @@
       "autoIncrement": true,
       "distribution": "store",
       "env": {
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "goog_aNAUZJDjjxoGZnAUJRgFSCeWWql",
         "PAYWALL_BYPASS": "false"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "goog_aNAUZJDjjxoGZnAUJRgFSCeWWql",
         "PAYWALL_BYPASS": "false"
       }
     }

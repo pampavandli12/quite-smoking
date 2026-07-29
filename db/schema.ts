@@ -6,6 +6,9 @@ export const smokingLog = sqliteTable('smoking_log', {
   timestamp: integer('timestamp')
     .notNull()
     .default(sql`(cast(strftime('%s', 'now') as integer) * 1000)`),
+  note: text('note'),
+  updatedAt: integer('updated_at'),
+  source: text('source').notNull().default('manual'),
 });
 
 export const smokingLogTriggers = sqliteTable('smoking_log_triggers', {

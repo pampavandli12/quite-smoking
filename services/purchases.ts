@@ -1,8 +1,8 @@
-import { REVENUE_CAT_KEYS } from '@/utils/constants';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import Purchases, {
   CustomerInfo,
+  CustomerInfoUpdateListener,
   PurchasesOffering,
   PurchasesPackage,
 } from 'react-native-purchases';
@@ -14,14 +14,45 @@ import {
 // Check if running in Expo Go
 const isExpoGo = Constants.appOwnership === 'expo';
 
-// RevenueCat API Keys
-// For Expo Go testing, use the Test Store API key from https://rev.cat/sdk-test-store
-const REVENUECAT_API_KEY = Platform.select({
-  ios: REVENUE_CAT_KEYS.ios,
-  android: REVENUE_CAT_KEYS.android,
-});
-
 export const REVENUECAT_ENTITLEMENT_ID = 'QuitSmoke Pro';
+const PURCHASES_UNAVAILABLE_MESSAGE =
+  'Subscriptions are temporarily unavailable. The free app remains available.';
+
+function getRevenueCatApiKey() {
+  return Platform.select({
+    android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
+    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY,
+  });
+}
+
+function isPlaceholderKey(apiKey: string) {
+  return apiKey.includes('YOUR_') || apiKey.includes('PLACEHOLDER');
+}
+
+function isValidStoreKey(apiKey: string) {
+  if (Platform.OS === 'android') {
+    return apiKey.startsWith('goog_');
+  }
+  if (Platform.OS === 'ios') {
+    return apiKey.startsWith('appl_');
+  }
+  return false;
+}
+
+function reportConfigurationError(message: string) {
+  if (__DEV__) {
+    console.warn(message);
+  } else {
+    console.error(message);
+  }
+}
+
+export function hasActivePremiumEntitlement(customerInfo: CustomerInfo) {
+  return Boolean(
+    customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID]?.isActive ??
+      customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID],
+  );
+}
 
 export type PurchaseOperationResult = {
   success: boolean;
@@ -33,6 +64,7 @@ class PurchaseService {
   private static instance: PurchaseService;
   private isConfigured = false;
   private mockMode = false;
+  private unavailableReason: string | null = null;
 
   private constructor() {}
 
@@ -48,11 +80,12 @@ class PurchaseService {
    * Call this when app starts
    */
   async initialize(userId?: string): Promise<void> {
-    // If running in Expo Go without proper keys, enable mock mode
-    if (
-      isExpoGo &&
-      (!REVENUECAT_API_KEY || REVENUECAT_API_KEY.includes('YOUR'))
-    ) {
+    const apiKey = getRevenueCatApiKey();
+    this.isConfigured = false;
+    this.mockMode = false;
+    this.unavailableReason = null;
+
+    if (isExpoGo && __DEV__ && (!apiKey || isPlaceholderKey(apiKey))) {
       console.warn(
         'Running in Expo Go without RevenueCat keys - using mock mode',
       );
@@ -61,16 +94,23 @@ class PurchaseService {
       return;
     }
 
-    if (!REVENUECAT_API_KEY) {
-      console.warn('RevenueCat API key not configured - using mock mode');
-      this.mockMode = true;
-      this.isConfigured = true;
+    if (!apiKey || isPlaceholderKey(apiKey)) {
+      reportConfigurationError('RevenueCat API key is not configured.');
+      this.unavailableReason = PURCHASES_UNAVAILABLE_MESSAGE;
+      return;
+    }
+
+    if (!__DEV__ && !isValidStoreKey(apiKey)) {
+      reportConfigurationError(
+        `Refusing to initialize RevenueCat with a non-production ${Platform.OS} key.`,
+      );
+      this.unavailableReason = PURCHASES_UNAVAILABLE_MESSAGE;
       return;
     }
 
     try {
       Purchases.configure({
-        apiKey: REVENUECAT_API_KEY,
+        apiKey,
         appUserID: userId,
       });
 
@@ -88,12 +128,16 @@ class PurchaseService {
       // If initialization fails, fall back to mock mode
       const errorMessage = getErrorMessage(error);
       if (
-        errorMessage.includes('Expo Go') ||
-        errorMessage.includes('native store')
+        __DEV__ &&
+        isExpoGo &&
+        (errorMessage.includes('Expo Go') ||
+          errorMessage.includes('native store'))
       ) {
         console.warn('Falling back to mock mode for Expo Go');
         this.mockMode = true;
         this.isConfigured = true;
+      } else {
+        this.unavailableReason = PURCHASES_UNAVAILABLE_MESSAGE;
       }
     }
   }
@@ -198,10 +242,7 @@ class PurchaseService {
 
     try {
       const customerInfo = await Purchases.getCustomerInfo();
-      return (
-        typeof customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !==
-        'undefined'
-      );
+      return hasActivePremiumEntitlement(customerInfo);
     } catch (error) {
       console.error('Error checking subscription:', error);
       return false;
@@ -222,6 +263,35 @@ class PurchaseService {
       console.error('Error getting customer info:', error);
       return null;
     }
+  }
+
+  subscribeToCustomerInfoUpdates(listener: CustomerInfoUpdateListener) {
+    if (this.mockMode || !this.isConfigured) {
+      return () => undefined;
+    }
+    Purchases.addCustomerInfoUpdateListener(listener);
+    return () => {
+      Purchases.removeCustomerInfoUpdateListener(listener);
+    };
+  }
+
+  async getAppUserID(): Promise<string | null> {
+    if (this.mockMode || !this.isConfigured) {
+      return null;
+    }
+    try {
+      return await Purchases.getAppUserID();
+    } catch (error) {
+      console.error('Error getting RevenueCat app user ID:', error);
+      return null;
+    }
+  }
+
+  getAvailability() {
+    return {
+      available: this.isConfigured && !this.mockMode,
+      reason: this.unavailableReason,
+    };
   }
 
   /**

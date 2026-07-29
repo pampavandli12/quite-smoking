@@ -48,14 +48,15 @@ describe('statistics calculations', () => {
     },
   );
 
-  test('calculates weekly savings using the existing baseline formula', () => {
+  test('calculates weekly savings through the current day', () => {
     expect(
       getSavings(
         { cigarettesPerDay: 10, costPerCigaretteCents: 1500 },
         'week',
         20,
+        new Date(2026, 6, 29),
       ),
-    ).toEqual({ cigarettesSaved: 50, moneySaved: 750 });
+    ).toEqual({ cigarettesSaved: 20, moneySaved: 300 });
   });
 
   test('preserves negative savings when usage exceeds the baseline', () => {
@@ -64,11 +65,12 @@ describe('statistics calculations', () => {
         { cigarettesPerDay: 1, costPerCigaretteCents: 1250 },
         'week',
         9,
+        new Date(2026, 6, 26),
       ),
-    ).toEqual({ cigarettesSaved: -2, moneySaved: -25 });
+    ).toEqual({ cigarettesSaved: -8, moneySaved: -100 });
   });
 
-  test('uses the current calendar month length', () => {
+  test('uses elapsed calendar days for the current month', () => {
     expect(
       getSavings(
         { cigarettesPerDay: 2, costPerCigaretteCents: 100 },
@@ -76,17 +78,18 @@ describe('statistics calculations', () => {
         0,
         new Date(2024, 1, 15),
       ),
-    ).toEqual({ cigarettesSaved: 58, moneySaved: 58 });
+    ).toEqual({ cigarettesSaved: 30, moneySaved: 30 });
   });
 
-  test('uses the existing 365-day yearly formula', () => {
+  test('uses elapsed calendar days for the current year', () => {
     expect(
       getSavings(
         { cigarettesPerDay: 2, costPerCigaretteCents: 100 },
         'year',
         10,
+        new Date(2024, 1, 29),
       ),
-    ).toEqual({ cigarettesSaved: 720, moneySaved: 720 });
+    ).toEqual({ cigarettesSaved: 110, moneySaved: 110 });
   });
 
   test('returns zero savings without settings', () => {
