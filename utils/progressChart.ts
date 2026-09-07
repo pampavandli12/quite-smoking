@@ -8,6 +8,36 @@ const INITIAL_SPACING = 12;
 const END_SPACING = 12;
 const SECTION_COUNT = 4;
 
+export const CHART_PLOT_HEIGHT = 198;
+export const CHART_DATA_POINT_RADIUS = 4;
+export const CHART_OVERFLOW_BOTTOM = CHART_DATA_POINT_RADIUS + 6;
+export const CHART_LABELS_EXTRA_HEIGHT = 8;
+export const CHART_X_AXIS_LABELS_HEIGHT = 22;
+export const CHART_Y_AXIS_LABEL_WIDTH = 36;
+export const CHART_POINTER_STRIP_HEIGHT = CHART_PLOT_HEIGHT - 18;
+
+export type ProgressChartVerticalLayout = {
+  dataPointRadius: number;
+  labelsExtraHeight: number;
+  overflowBottom: number;
+  plotHeight: number;
+  pointerStripHeight: number;
+  xAxisLabelsHeight: number;
+  yAxisLabelWidth: number;
+};
+
+export function getProgressChartVerticalLayout(): ProgressChartVerticalLayout {
+  return {
+    dataPointRadius: CHART_DATA_POINT_RADIUS,
+    labelsExtraHeight: CHART_LABELS_EXTRA_HEIGHT,
+    overflowBottom: CHART_OVERFLOW_BOTTOM,
+    plotHeight: CHART_PLOT_HEIGHT,
+    pointerStripHeight: CHART_POINTER_STRIP_HEIGHT,
+    xAxisLabelsHeight: CHART_X_AXIS_LABELS_HEIGHT,
+    yAxisLabelWidth: CHART_Y_AXIS_LABEL_WIDTH,
+  };
+}
+
 const PERIOD_LABELS: Record<StatsPeriod, string[]> = {
   week: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   month: ['W1', 'W2', 'W3', 'W4'],

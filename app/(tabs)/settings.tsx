@@ -1,5 +1,5 @@
 import { getSmokingSettings } from '@/db';
-import { type AppTheme } from '@/app/theme';
+import { type AppTheme } from '@/theme';
 import { AppSymbol, type AppSymbolName } from '@/components/AppSymbol';
 import {
   PremiumCard,

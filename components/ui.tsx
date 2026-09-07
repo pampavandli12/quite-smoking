@@ -1,4 +1,4 @@
-import { designTokens, type AppTheme } from '@/app/theme';
+import { designTokens, type AppTheme } from '@/theme';
 import { AppSymbol, type AppSymbolName } from '@/components/AppSymbol';
 import { useAppMotion } from '@/hooks/useAppMotion';
 import type { ReactNode } from 'react';

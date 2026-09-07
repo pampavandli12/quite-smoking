@@ -1,4 +1,4 @@
-import { type AppTheme } from '@/app/theme';
+import { type AppTheme } from '@/theme';
 import { AppSymbol, type AppSymbolName } from '@/components/AppSymbol';
 import { SafeLineChart, type SafeChartPoint } from '@/components/SafeCharts';
 import { useAppMotion } from '@/hooks/useAppMotion';
@@ -8,6 +8,7 @@ import {
   formatProgressTooltip,
   getProgressChartFullLabel,
   getProgressChartLabels,
+  getProgressChartVerticalLayout,
 } from '@/utils/progressChart';
 import {
   getAverage,
@@ -263,6 +264,7 @@ export default function StatsTimelineChart({
           value,
           label: labels[index] ?? '',
           tooltipLabel: fullLabel,
+          hideDataPoint: value === 0,
           accessibilityLabel: `${fullLabel}: ${value} ${
             value === 1 ? 'cigarette' : 'cigarettes'
           }`,
@@ -271,6 +273,7 @@ export default function StatsTimelineChart({
     [chartData, labels, period],
   );
   const chartLayout = calculateProgressChartLayout(chartWidth, data.length);
+  const chartVertical = getProgressChartVerticalLayout();
   const axisMaximum = calculateProgressAxisMax(chartData);
   const hasData = chartData.some((value) => value > 0);
   const comparisonCopy =
@@ -461,55 +464,62 @@ export default function StatsTimelineChart({
             </Text>
           </View>
         ) : chartWidth > 0 ? (
-          <SafeLineChart
-            animationDuration={220}
-            areaChart
-            color={theme.colors.secondary}
-            curvature={0.16}
-            curved
-            data={data}
-            dataPointsColor={theme.colors.primary}
-            dataPointsRadius={4}
-            disableScroll
-            endFillColor={theme.colors.surface}
-            endOpacity={0}
-            endSpacing={chartLayout.endSpacing}
-            formatYLabel={(label) => String(Math.round(Number(label)))}
-            height={220}
-            hideRules={false}
-            initialSpacing={chartLayout.initialSpacing}
-            isAnimated={!reduceMotion}
-            maxValue={axisMaximum}
-            noOfSections={4}
-            pointerConfig={{
-              activatePointersOnLongPress: false,
-              autoAdjustPointerLabelPosition: true,
-              pointerColor: theme.colors.primary,
-              pointerLabelComponent: (items) => (
-                <PointTooltip comparison={comparisonCopy} item={items[0]} />
-              ),
-              pointerLabelHeight: 78,
-              pointerLabelWidth: 166,
-              pointerStripColor: theme.colors.outline,
-              pointerStripHeight: 184,
-              pointerStripWidth: 1,
-              radius: 6,
-            }}
-            rulesColor={theme.colors.outlineVariant}
-            showVerticalLines={false}
-            spacing={chartLayout.spacing}
-            startFillColor={theme.colors.secondaryContainer}
-            startOpacity={theme.dark ? 0.22 : 0.34}
-            thickness={3}
-            width={chartLayout.plotWidth}
-            xAxisLabelTextStyle={{
-              color: theme.colors.onSurfaceVariant,
-              fontSize: period === 'year' ? 9 : 11,
-            }}
-            xAxisThickness={0}
-            yAxisTextStyle={{ color: theme.colors.onSurfaceVariant, fontSize: 11 }}
-            yAxisThickness={0}
-          />
+          <View style={styles.chartPlot}>
+            <SafeLineChart
+              animationDuration={220}
+              areaChart
+              color={theme.colors.secondary}
+              curvature={0.16}
+              curved
+              data={data}
+              dataPointsColor={theme.colors.primary}
+              dataPointsRadius={chartVertical.dataPointRadius}
+              disableScroll
+              endFillColor={theme.colors.surface}
+              endOpacity={0}
+              endSpacing={chartLayout.endSpacing}
+              formatYLabel={(label) => String(Math.round(Number(label)))}
+              height={chartVertical.plotHeight}
+              hideRules={false}
+              initialSpacing={chartLayout.initialSpacing}
+              isAnimated={!reduceMotion}
+              labelsExtraHeight={chartVertical.labelsExtraHeight}
+              maxValue={axisMaximum}
+              noOfSections={4}
+              overflowBottom={chartVertical.overflowBottom}
+              pointerConfig={{
+                activatePointersOnLongPress: false,
+                autoAdjustPointerLabelPosition: true,
+                pointerColor: theme.colors.primary,
+                pointerLabelComponent: (items) => (
+                  <PointTooltip comparison={comparisonCopy} item={items[0]} />
+                ),
+                pointerLabelHeight: 78,
+                pointerLabelWidth: 166,
+                pointerStripColor: theme.colors.outline,
+                pointerStripHeight: chartVertical.pointerStripHeight,
+                pointerStripWidth: 1,
+                radius: 6,
+              }}
+              rulesColor={theme.colors.outlineVariant}
+              rulesType='dashed'
+              showVerticalLines={false}
+              spacing={chartLayout.spacing}
+              startFillColor={theme.colors.secondaryContainer}
+              startOpacity={theme.dark ? 0.22 : 0.34}
+              thickness={2.5}
+              width={chartLayout.plotWidth}
+              xAxisLabelTextStyle={{
+                color: theme.colors.onSurfaceVariant,
+                fontSize: period === 'year' ? 9 : 11,
+              }}
+              xAxisLabelsHeight={chartVertical.xAxisLabelsHeight}
+              xAxisThickness={0}
+              yAxisLabelWidth={chartVertical.yAxisLabelWidth}
+              yAxisTextStyle={{ color: theme.colors.onSurfaceVariant, fontSize: 11 }}
+              yAxisThickness={0}
+            />
+          </View>
         ) : (
           <View style={styles.chartPlaceholder} />
         )}
@@ -612,9 +622,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 24,
-    overflow: 'hidden',
-    paddingBottom: 14,
-    paddingHorizontal: 8,
+    paddingBottom: 18,
+    paddingHorizontal: 4,
     paddingTop: 18,
   },
   chartHeading: {
@@ -640,7 +649,7 @@ const styles = StyleSheet.create({
   },
   chartEmpty: {
     alignItems: 'center',
-    height: 220,
+    height: 198,
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
@@ -664,11 +673,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   chartPlaceholder: {
-    height: 220,
+    height: 198,
+  },
+  chartPlot: {
+    width: '100%',
   },
   chartHint: {
     paddingHorizontal: 10,
-    paddingTop: 6,
+    paddingTop: 10,
     textAlign: 'center',
   },
   tooltip: {

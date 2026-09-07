@@ -9,6 +9,7 @@ export type SafeChartPoint = {
   dataPointText?: string;
   accessibilityLabel?: string;
   frontColor?: string;
+  hideDataPoint?: boolean;
   tooltipLabel?: string;
 };
 
@@ -57,7 +58,12 @@ type LineProps = {
   endOpacity?: number;
   disableScroll?: boolean;
   formatYLabel?: (label: string) => string;
+  labelsExtraHeight?: number;
+  overflowBottom?: number;
   pointerConfig?: SafeLinePointerConfig;
+  rulesType?: 'solid' | 'dashed' | 'dotted';
+  xAxisLabelsHeight?: number;
+  yAxisLabelWidth?: number;
 };
 
 type BarProps = {
