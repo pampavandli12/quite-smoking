@@ -1,6 +1,6 @@
 export default ({ config }) => ({
   expo: {
-    name: 'Quit Smoking - Smoke Tracker',
+    name: 'Quit Smoking',
     slug: 'quit-smoking',
     version: '1.0.0',
     orientation: 'portrait',
@@ -16,10 +16,16 @@ export default ({ config }) => ({
 
     android: {
       adaptiveIcon: {
-        backgroundColor: '#ffffff',
-        foregroundImage: './assets/icons/adaptive-icon.png',
-        monochromeImage: './assets/icons/adaptive-icon.png',
+        backgroundColor: '#E7F1EE',
+        foregroundImage: './assets/images/android-icon-foreground.png',
+        monochromeImage: './assets/images/android-icon-monochrome.png',
       },
+      allowBackup: false,
+      blockedPermissions: [
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+        'android.permission.SYSTEM_ALERT_WINDOW',
+      ],
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: 'com.dailyapplabs.quitsmoke',
@@ -46,6 +52,15 @@ export default ({ config }) => ({
         },
       ],
       'expo-font',
+      'expo-notifications',
+      'expo-web-browser',
+      [
+        'expo-dev-client',
+        {
+          addGeneratedScheme: false,
+        },
+      ],
+      './plugins/withAndroidReleaseHardening',
     ],
 
     experiments: {
@@ -59,7 +74,6 @@ export default ({ config }) => ({
         projectId: 'ac159556-9ec1-4d90-a104-4c0483eeb119',
       },
 
-      // ✅ this comes from eas.json env
       PAYWALL_BYPASS: process.env.PAYWALL_BYPASS || 'false',
     },
   },

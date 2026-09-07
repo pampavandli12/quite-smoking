@@ -1,40 +1,57 @@
 import {
   getDetailedWeeklyBreakdown,
   getTodayStats,
+  getSmokingSettings,
   getTop5Triggers,
   getTopTrigger,
   getYesterdayStats,
-  type DetailedWeeklyBreakdownItem,
   type TriggerCountRow,
 } from '@/db';
 import StatsTimelineChart, {
   type StatsPeriod,
-  type TimelineSummary,
 } from '@/components/StatsTimelineChart';
+import { AppSymbol } from '@/components/AppSymbol';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Card, Icon, Surface, Text, useTheme } from 'react-native-paper';
+import { Button, Card, Surface, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  getComparisonLabel,
+  getCurrentPeriodLabel,
+  getPercentageChange,
+  type DetailedWeeklyBreakdownItem,
+  type SmokingBaseline,
+} from '@/utils/statistics';
+import { measureDevelopmentAsync } from '@/utils/developmentPerformance';
+import {
+  DailyBreakdownSection,
+  TopTriggersSection,
+} from '@/components/StatsBreakdownSections';
+import { loadTimeline } from '@/services/statsTimeline';
+import { resolveFeatureAccess } from '@/services/accessService';
+import { router } from 'expo-router';
+import AdvancedInsights from '@/components/AdvancedInsights';
+import { PremiumCard, SkeletonCard } from '@/components/ui';
 
 const fallbackMessages = [
-  'Every cigarette skipped is a victory 🏆',
-  'Within 20 minutes of not smoking, your heart rate drops ❤️',
-  'Your lungs start to heal the moment you reduce smoking 🫁',
-  "You're stronger than your cravings 💪",
-  'Small steps every day lead to big changes 🌟',
+  'Every recorded choice helps you understand your pattern.',
+  'Pause and notice what was happening before each recorded moment.',
+  'Small, repeatable changes can make your plan easier to follow.',
+  'A difficult day does not erase the information you have gathered.',
+  'Keep tracking without judgment and adjust one step at a time.',
 ];
 
 function getProgressMessage(today: number, yesterday: number) {
   if (today < yesterday) {
-    return 'Great job! You smoked fewer cigarettes today than yesterday 🎉';
+    return 'You recorded fewer cigarettes today than yesterday. Small changes add up.';
   }
 
   if (today > yesterday) {
-    return 'You smoked more today than yesterday. Think about what triggered it 💭';
+    return 'Today had more recorded moments. Your plan continues—notice what was happening around them.';
   }
 
-  return 'Consistent! You smoked the same as yesterday. Try to cut down tomorrow 💪';
+  return 'Today matches yesterday. Keep observing your patterns without judgment.';
 }
 
 function getTriggerMessage(trigger: string) {
@@ -68,18 +85,6 @@ function getFallbackMessage() {
   return fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
 }
 
-function getComparisonLabel(period: StatsPeriod) {
-  return period === 'week'
-    ? 'last week'
-    : period === 'month'
-      ? 'last month'
-      : 'last year';
-}
-
-function getCurrentPeriodLabel(period: StatsPeriod) {
-  return period === 'week' ? 'week' : period === 'month' ? 'month' : 'year';
-}
-
 export default function StatsPage() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -91,82 +96,131 @@ export default function StatsPage() {
   >([]);
   const [healthInsight, setHealthInsight] = useState('');
   const [topTriggers, setTopTriggers] = useState<TriggerCountRow[]>([]);
-  const percentageChange =
-    previousTotal > 0
-      ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
-      : 0;
-
-  // Generate health insight
-  const generateHealthInsight = useCallback(async () => {
-    try {
-      const [today, yesterday, topTrigger] = await Promise.all([
-        getTodayStats(),
-        getYesterdayStats(),
-        getTopTrigger(),
-      ]);
-
-      // Priority 1: Progress message if there's data
-      if (today > 0 || yesterday > 0) {
-        setHealthInsight(getProgressMessage(today, yesterday));
-        return;
-      }
-
-      // Priority 2: Trigger message if there's a top trigger
-      if (topTrigger) {
-        setHealthInsight(getTriggerMessage(topTrigger));
-        return;
-      }
-
-      // Priority 3: Fallback message
-      setHealthInsight(getFallbackMessage());
-    } catch (error) {
-      console.error('Error generating health insight:', error);
-      setHealthInsight(getFallbackMessage());
-    }
-  }, []);
+  const [chartData, setChartData] = useState<number[]>([0]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [timelineError, setTimelineError] = useState('');
+  const [smokingSettings, setSmokingSettings] =
+    useState<SmokingBaseline | null>(null);
+  const statsRequestId = useRef(0);
+  const hasLoadedRef = useRef(false);
+  const percentageChange = getPercentageChange(currentTotal, previousTotal);
 
   // Load stats from database
   const loadStats = useCallback(async () => {
-    try {
-      if (selectedPeriod === 'week') {
-        const [breakdown, triggers] = await Promise.all([
-          getDetailedWeeklyBreakdown(),
-          getTop5Triggers(),
-        ]);
-
-        setDailyBreakdown(breakdown);
-        setTopTriggers(triggers);
-      } else {
-        setDailyBreakdown([]);
-        setTopTriggers([]);
-      }
-
-      // Generate health insight
-      await generateHealthInsight();
-    } catch (error) {
-      console.error('Error loading stats:', error);
+    const requestId = ++statsRequestId.current;
+    if (!hasLoadedRef.current) {
+      setInitialLoading(true);
     }
-  }, [generateHealthInsight, selectedPeriod]);
+    setTimelineError('');
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+    try {
+      await measureDevelopmentAsync(
+        `StatsPage load (${selectedPeriod})`,
+        async () => {
+        const loadChart = async () => {
+          try {
+            const timeline = await loadTimeline(selectedPeriod);
 
-  // Reload stats when tab is focused
+            if (requestId === statsRequestId.current) {
+              setCurrentTotal(timeline.currentTotal);
+              setPreviousTotal(timeline.previousTotal);
+              setChartData(timeline.data);
+            }
+          } catch (error) {
+            console.error('Error loading timeline chart:', error);
+
+            if (requestId === statsRequestId.current) {
+              setTimelineError(
+                'Your timeline could not be refreshed. Try again in a moment.',
+              );
+            }
+          }
+        };
+
+        const loadDetails = async () => {
+          try {
+            if (selectedPeriod === 'week') {
+              const [breakdown, triggers] = await Promise.all([
+                getDetailedWeeklyBreakdown(),
+                getTop5Triggers(),
+              ]);
+
+              if (requestId !== statsRequestId.current) {
+                return;
+              }
+
+              setDailyBreakdown(breakdown);
+              setTopTriggers(triggers);
+            } else {
+              if (requestId !== statsRequestId.current) {
+                return;
+              }
+            }
+
+            const [today, yesterday, topTrigger, settings] = await Promise.all([
+              getTodayStats(),
+              getYesterdayStats(),
+              getTopTrigger(),
+              getSmokingSettings(),
+            ]);
+
+            if (requestId !== statsRequestId.current) {
+              return;
+            }
+
+            setHealthInsight(
+              today > 0 || yesterday > 0
+                ? getProgressMessage(today, yesterday)
+                : topTrigger
+                  ? getTriggerMessage(topTrigger)
+                  : getFallbackMessage(),
+            );
+            setSmokingSettings(settings ?? null);
+          } catch (error) {
+            console.error('Error loading stats:', error);
+          }
+        };
+
+        if (selectedPeriod !== 'week') {
+          if (requestId === statsRequestId.current) {
+            // Preserve the original immediate clearing before insight loading.
+            setDailyBreakdown([]);
+            setTopTriggers([]);
+          }
+        }
+
+          await Promise.all([loadChart(), loadDetails()]);
+        },
+      );
+    } finally {
+      if (requestId === statsRequestId.current) {
+        hasLoadedRef.current = true;
+        setInitialLoading(false);
+      }
+    }
+  }, [selectedPeriod]);
+
+  // Load on initial focus and reload whenever the tab regains focus.
   useFocusEffect(
     useCallback(() => {
       loadStats();
+
+      return () => {
+        statsRequestId.current += 1;
+      };
     }, [loadStats]),
   );
 
-  const handleTimelineSummaryChange = useCallback(
-    (summary: TimelineSummary) => {
-      setSelectedPeriod(summary.period);
-      setCurrentTotal(summary.currentTotal);
-      setPreviousTotal(summary.previousTotal);
-    },
-    [],
-  );
+  const handlePeriodChange = useCallback(async (period: StatsPeriod) => {
+    if (period !== 'week') {
+      const access = await resolveFeatureAccess();
+      if (!access.canViewFullExistingStats) {
+        router.push('/?paywall=true');
+        return;
+      }
+    }
+    setSelectedPeriod(period);
+  }, []);
 
   const comparisonLabel = getComparisonLabel(selectedPeriod);
   const currentPeriodLabel = getCurrentPeriodLabel(selectedPeriod);
@@ -183,105 +237,79 @@ export default function StatsPage() {
         {/* Header */}
         <Surface style={styles.header} elevation={0}>
           <Text variant='headlineSmall' style={styles.headerTitle}>
-            Smoking Statistics
+            Your progress
           </Text>
           <Text variant='bodyMedium' style={styles.headerSubtitle}>
-            Track your progress
+            Patterns and wins from your local data
           </Text>
         </Surface>
 
-        <StatsTimelineChart onSummaryChange={handleTimelineSummaryChange} />
-
-        {/* Top Triggers - Only for week view */}
-        {selectedPeriod === 'week' && topTriggers.length > 0 && (
-          <Surface style={styles.section} elevation={0}>
-            <Text variant='titleLarge' style={styles.sectionTitle}>
-              Top Triggers
-            </Text>
-            <Text variant='bodyMedium' style={styles.sectionSubtitle}>
-              What makes you reach for a cigarette
-            </Text>
-
-            {topTriggers.map((item, index) => (
-              <Card key={index} style={styles.triggerCard}>
-                <Card.Content style={styles.triggerCardContent}>
-                  <Surface style={styles.triggerLeft} elevation={0}>
-                    <Surface style={styles.triggerRank} elevation={0}>
-                      <Text variant='bodyMedium' style={styles.triggerRankText}>
-                        {index + 1}
-                      </Text>
-                    </Surface>
-                    <Text variant='bodyLarge' style={styles.triggerName}>
-                      {item.trigger}
-                    </Text>
-                  </Surface>
-                  <Surface style={styles.triggerRight} elevation={0}>
-                    <Surface
-                      style={styles.triggerProgressBarContainer}
-                      elevation={0}
-                    >
-                      <View
-                        style={[
-                          styles.triggerProgressBarFilled,
-                          {
-                            width: `${(item.count / (topTriggers[0]?.count || 1)) * 100}%`,
-                          },
-                        ]}
-                      />
-                    </Surface>
-                    <Text variant='titleMedium' style={styles.triggerCount}>
-                      {item.count}
-                    </Text>
-                  </Surface>
-                </Card.Content>
-              </Card>
-            ))}
+        {initialLoading ? (
+          <Surface style={styles.loadingGroup} elevation={0}>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
           </Surface>
+        ) : (
+          <>
+            {!!timelineError && (
+              <PremiumCard style={styles.errorCard}>
+                <Surface style={styles.errorRow} elevation={0}>
+                  <AppSymbol
+                    name='cloud-alert-outline'
+                    size={22}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <View style={styles.errorCopy}>
+                    <Text variant='titleSmall'>Progress needs a moment</Text>
+                    <Text
+                      variant='bodySmall'
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {timelineError}
+                    </Text>
+                  </View>
+                  <Button compact mode='text' onPress={loadStats}>
+                    Retry
+                  </Button>
+                </Surface>
+              </PremiumCard>
+            )}
+            <StatsTimelineChart
+              chartData={chartData}
+              currentTotal={currentTotal}
+              onPeriodChange={handlePeriodChange}
+              period={selectedPeriod}
+              previousTotal={previousTotal}
+              smokingSettings={smokingSettings}
+            />
+          </>
         )}
 
-        {/* Daily Breakdown - Only for week view */}
-        {selectedPeriod === 'week' && dailyBreakdown.length > 0 && (
-          <Surface style={styles.section} elevation={0}>
-            <Text variant='titleLarge' style={styles.sectionTitle}>
-              Daily Breakdown
-            </Text>
+        <AdvancedInsights />
 
-            {dailyBreakdown.map((item, index) => (
-              <Card key={index} style={styles.dayCard}>
-                <Card.Content style={styles.dayCardContent}>
-                  <Surface style={styles.dayLeft} elevation={0}>
-                    <Text variant='bodyLarge' style={styles.dayName}>
-                      {item.day}
-                    </Text>
-                    <Text variant='bodySmall' style={styles.dayDate}>
-                      {item.date}
-                    </Text>
-                  </Surface>
-                  <Surface style={styles.dayRight} elevation={0}>
-                    <Surface style={styles.progressBarContainer} elevation={0}>
-                      <View
-                        style={[
-                          styles.progressBarFilled,
-                          { width: `${item.progress * 100}%` },
-                        ]}
-                      />
-                    </Surface>
-                    <Text variant='titleMedium' style={styles.dayCount}>
-                      {item.count}
-                    </Text>
-                  </Surface>
-                </Card.Content>
-              </Card>
-            ))}
-          </Surface>
+        {selectedPeriod === 'week' && (
+          <>
+            <TopTriggersSection triggers={topTriggers} />
+            <DailyBreakdownSection breakdown={dailyBreakdown} />
+          </>
         )}
 
         {/* Your Goals */}
-        <Card style={styles.goalCard}>
+        <Card
+          mode='contained'
+          style={[
+            styles.goalCard,
+            {
+              backgroundColor: theme.colors.elevation.level1,
+              borderColor: theme.colors.outlineVariant,
+            },
+          ]}
+        >
           <Card.Content>
             <Surface style={styles.goalHeader} elevation={0}>
               <Text variant='titleLarge' style={styles.goalTitle}>
-                Your Goals
+                Your goals
               </Text>
               {previousTotal > 0 && (
                 <Surface
@@ -315,10 +343,14 @@ export default function StatsPage() {
                   variant='bodyMedium'
                   style={[
                     styles.goalStatus,
-                    { color: percentageChange <= 0 ? '#4CAF50' : '#F44336' },
+                    {
+                      color: percentageChange <= 0
+                        ? theme.colors.primary
+                        : theme.colors.onSurfaceVariant,
+                    },
                   ]}
                 >
-                  {percentageChange <= 0 ? 'On track' : 'Need improvement'}
+                  {percentageChange <= 0 ? 'Moving gently forward' : 'Your plan continues'}
                 </Text>
               </>
             ) : (
@@ -335,20 +367,24 @@ export default function StatsPage() {
 
         {/* Health Insight */}
         <Card
+          mode='contained'
           style={[
             styles.insightCard,
-            { backgroundColor: theme.colors.primaryContainer },
+            {
+              backgroundColor: theme.colors.primaryContainer,
+              borderColor: theme.colors.outlineVariant,
+            },
           ]}
         >
           <Card.Content>
             <Surface style={styles.insightHeader} elevation={0}>
-              <Icon
-                source='lightbulb-outline'
+              <AppSymbol
+                name='lightbulb-outline'
                 size={20}
                 color={theme.colors.primary}
               />
               <Text variant='titleMedium' style={styles.insightTitle}>
-                Health Insight
+                Helpful insight
               </Text>
             </Surface>
             <Text variant='bodyMedium' style={styles.insightText}>
@@ -381,121 +417,29 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     opacity: 0.7,
   },
-  section: {
+  loadingGroup: {
+    backgroundColor: 'transparent',
+    gap: 12,
     marginBottom: 24,
-    backgroundColor: 'transparent',
   },
-  sectionTitle: {
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    opacity: 0.6,
-    marginBottom: 16,
-  },
-  triggerCard: {
+  errorCard: {
     marginBottom: 12,
   },
-  triggerCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  errorRow: {
     alignItems: 'center',
-    paddingVertical: 8,
-  },
-  triggerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
     backgroundColor: 'transparent',
-  },
-  triggerRank: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  triggerRankText: {
-    color: '#4285F4',
-    fontWeight: '600',
-  },
-  triggerName: {
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  triggerRight: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    gap: 10,
+  },
+  errorCopy: {
     flex: 1,
-    backgroundColor: 'transparent',
-  },
-  triggerProgressBarContainer: {
-    flex: 1,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E8E8E8',
-    overflow: 'hidden',
-  },
-  triggerProgressBarFilled: {
-    height: '100%',
-    backgroundColor: '#4285F4',
-    borderRadius: 6,
-  },
-  triggerCount: {
-    fontWeight: '600',
-    minWidth: 30,
-    textAlign: 'right',
-    color: '#4285F4',
-  },
-  dayCard: {
-    marginBottom: 12,
-  },
-  dayCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  dayLeft: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  dayName: {
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  dayDate: {
-    opacity: 0.6,
-  },
-  dayRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1.8,
-    backgroundColor: 'transparent',
-  },
-  progressBarContainer: {
-    flex: 1,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E8E8E8',
-    overflow: 'hidden',
-  },
-  progressBarFilled: {
-    height: '100%',
-    backgroundColor: '#4285F4',
-    borderRadius: 6,
-  },
-  dayCount: {
-    fontWeight: '600',
-    minWidth: 30,
-    textAlign: 'right',
+    minWidth: 0,
   },
   goalCard: {
+    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 24,
+    borderRadius: 22,
+    overflow: 'hidden',
   },
   goalHeader: {
     flexDirection: 'row',
@@ -527,7 +471,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   insightCard: {
+    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 16,
+    borderRadius: 22,
+    overflow: 'hidden',
   },
   insightHeader: {
     flexDirection: 'row',

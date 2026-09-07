@@ -2,9 +2,17 @@ import { drizzle } from 'drizzle-orm/expo-sqlite';
 import {
   openDatabaseSync,
   type SQLiteBindParams,
+  type SQLiteDatabase,
   type SQLiteRunResult,
 } from 'expo-sqlite';
 import * as schema from './schema';
+import {
+  CREATE_INDEXES_SQL,
+  CREATE_TABLES_SQL,
+  DATABASE_MIGRATIONS,
+  DATABASE_VERSION,
+  ENSURE_PRODUCT_TABLES_SQL,
+} from './migrations';
 
 export const expoDb = openDatabaseSync('quitSmoking.db');
 
@@ -47,64 +55,100 @@ export function dbGetAllAsync<T>(
   return serializeSqlite(() => expoDb.getAllAsync<T>(source, params));
 }
 
+export function dbTransactionAsync<T>(
+  operation: (transaction: SQLiteDatabase) => Promise<T>,
+) {
+  return serializeSqlite(async () => {
+    const results: T[] = [];
+
+    await expoDb.withTransactionAsync(async () => {
+      results.push(await operation(expoDb));
+    });
+
+    if (results.length !== 1) {
+      throw new Error('Database transaction completed without a result.');
+    }
+
+    return results[0];
+  });
+}
+
+async function ensureProductSchema() {
+  await dbExecAsync(ENSURE_PRODUCT_TABLES_SQL);
+  const columns = await dbGetAllAsync<{ name: string }>(
+    `PRAGMA table_info(smoking_log)`,
+  );
+  const columnNames = new Set(columns.map((column) => column.name));
+
+  if (!columnNames.has('note')) {
+    await dbExecAsync(`ALTER TABLE smoking_log ADD COLUMN note TEXT`);
+  }
+  if (!columnNames.has('updated_at')) {
+    await dbExecAsync(`ALTER TABLE smoking_log ADD COLUMN updated_at INTEGER`);
+  }
+  if (!columnNames.has('source')) {
+    await dbExecAsync(
+      `ALTER TABLE smoking_log
+       ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`,
+    );
+  }
+}
+
 // Initialize database tables
 export async function initializeDatabase() {
   try {
-    // Create smoking_log table
-    await dbExecAsync(`
-      CREATE TABLE IF NOT EXISTS smoking_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL DEFAULT (cast(strftime('%s', 'now') as integer) * 1000)
-      );
-    `);
+    await dbExecAsync(CREATE_TABLES_SQL);
 
-    // Create smoking_log_triggers table
-    await dbExecAsync(`
-      CREATE TABLE IF NOT EXISTS smoking_log_triggers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        log_id INTEGER NOT NULL,
-        trigger TEXT NOT NULL,
-        FOREIGN KEY (log_id) REFERENCES smoking_log(id)
-      );
-    `);
+    const versionRow = await dbGetFirstAsync<{ userVersion: number }>(
+      'SELECT user_version as userVersion FROM pragma_user_version',
+    );
+    const currentVersion = versionRow?.userVersion ?? 0;
 
-    // Create user_smoking_settings table
-    await dbExecAsync(`
-      CREATE TABLE IF NOT EXISTS user_smoking_settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cigarettes_per_day INTEGER NOT NULL,
-        cost_per_cigarette_cents INTEGER NOT NULL,
-        created_at INTEGER NOT NULL DEFAULT (cast(strftime('%s', 'now') as integer) * 1000)
-      );
-    `);
+    for (const migration of DATABASE_MIGRATIONS) {
+      if (migration.version <= currentVersion) {
+        continue;
+      }
+      await dbTransactionAsync(async (transaction) => {
+        await migration.migrate(transaction);
+        await transaction.execAsync(
+          `PRAGMA user_version = ${migration.version}`,
+        );
+      });
+    }
 
-    await dbExecAsync(`
-      DROP INDEX IF EXISTS idx_smoking_log_timestamp_ms;
+    const metadataTable = await dbGetFirstAsync<{ name: string }>(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'table' AND name = 'app_metadata'`,
+    );
 
-      UPDATE smoking_log
-      SET timestamp = CAST(strftime('%s', timestamp, 'utc') AS INTEGER) * 1000
-      WHERE typeof(timestamp) = 'text'
-        AND strftime('%s', timestamp, 'utc') IS NOT NULL;
-
-      UPDATE user_smoking_settings
-      SET created_at = CAST(strftime('%s', created_at, 'utc') AS INTEGER) * 1000
-      WHERE typeof(created_at) = 'text'
-        AND strftime('%s', created_at, 'utc') IS NOT NULL;
-    `);
+    // Development hot reloads and interrupted historical builds may leave a
+    // version marker ahead of the additive schema. Reconcile safely without
+    // modifying existing smoking data.
+    await ensureProductSchema();
+    if (currentVersion >= 2 && !metadataTable) {
+      const existing = await dbGetFirstAsync<{ count: number }>(`
+        SELECT
+          (SELECT COUNT(*) FROM smoking_log) +
+          (SELECT COUNT(*) FROM user_smoking_settings) AS count
+      `);
+      if ((existing?.count ?? 0) > 0) {
+        await dbRunAsync(
+          `INSERT OR IGNORE INTO app_metadata (key, value, updated_at)
+           VALUES ('legacy_access', 'true', ?)`,
+          [Date.now()],
+        );
+      }
+    }
 
     try {
-      await dbExecAsync(`
-        CREATE INDEX IF NOT EXISTS idx_smoking_log_timestamp
-        ON smoking_log(timestamp);
-
-        CREATE INDEX IF NOT EXISTS idx_smoking_log_triggers_log_id
-        ON smoking_log_triggers(log_id);
-      `);
+      await dbExecAsync(CREATE_INDEXES_SQL);
     } catch (indexError) {
       console.warn('Database indexes could not be created:', indexError);
     }
 
-    console.log('Database initialized successfully');
+    if (__DEV__) {
+      console.log('Database initialized successfully');
+    }
     return true;
   } catch (error) {
     console.error(

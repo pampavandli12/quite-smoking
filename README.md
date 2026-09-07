@@ -10,6 +10,16 @@ Install dependencies:
 npm install
 ```
 
+Create the ignored local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Set `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` in `.env.local` to the RevenueCat
+Test Store public SDK key. Expo loads this file for `npx expo run:android` and
+`npm start`; EAS profiles use the values in `eas.json` instead.
+
 ## Local Android Development
 
 This project uses a development build because it includes native modules such as RevenueCat purchases.
@@ -72,7 +82,8 @@ Creates a store-distributed build for closed testing:
 eas build --profile closedTest --platform android
 ```
 
-Note: if you want testers to validate the real Play Billing/RevenueCat flow, set `PAYWALL_BYPASS=false` for this profile before building.
+This profile uses `PAYWALL_BYPASS=false` and the Google Play RevenueCat public
+SDK key configured in `eas.json`.
 
 ### Production build
 
@@ -111,3 +122,14 @@ npm run lint
 3. `app/index.tsx` reads it with `expo-constants`.
 
 Use `PAYWALL_BYPASS=true` only for development/internal testing. Use `PAYWALL_BYPASS=false` for production and for any test build where purchases must be validated.
+
+## Native project and billing keys
+
+The project uses Expo CNG: `android/` is generated locally and by EAS from
+`app.config.js` and is intentionally not committed. Run `npx expo
+prebuild --platform android` only when a native inspection is needed.
+
+Development may use a RevenueCat Test Store `test_` public SDK key. The
+`closedTest` and `production` profiles must use a Google Play `goog_` public SDK
+key. A missing, placeholder, or test key in a production build disables purchase
+actions; it never enables mock purchases.

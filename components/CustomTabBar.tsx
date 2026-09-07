@@ -17,6 +17,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from 'react-native-paper';
+import * as Haptics from 'expo-haptics';
+import { useAppMotion } from '@/hooks/useAppMotion';
 
 const BAR_HORIZONTAL_MARGIN = 56;
 const BAR_PADDING = 8;
@@ -45,18 +47,17 @@ function TabBarItem({
   onPress,
   testID,
 }: TabBarItemProps) {
+  const { reduceMotion } = useAppMotion();
   const progress = useDerivedValue(() =>
     withTiming(isFocused ? 1 : 0, { duration: ACTIVE_DURATION }),
   );
 
   const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: 3 * progress.value }],
+    transform: [{ scale: reduceMotion ? 1 : 0.94 + 0.06 * progress.value }],
   }));
 
   const labelStyle = useAnimatedStyle(() => ({
-    maxHeight: 18 * (1 - progress.value),
-    opacity: 1 - progress.value,
-    transform: [{ translateY: 4 * progress.value }],
+    opacity: 0.72 + 0.28 * progress.value,
   }));
 
   const iconColor = isFocused ? activeColor : inactiveColor;
@@ -166,6 +167,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             });
 
             if (!isFocused && !tabPressEvent.defaultPrevented) {
+              Haptics.selectionAsync();
               navigation.navigate(route.name, route.params);
             }
           };
@@ -212,7 +214,7 @@ const styles = StyleSheet.create({
     elevation: 12,
     flexDirection: 'row',
     justifyContent: 'center',
-    minHeight: 66,
+    minHeight: 62,
     padding: 8,
     shadowOffset: {
       width: 0,
@@ -227,8 +229,8 @@ const styles = StyleSheet.create({
   item: {
     alignItems: 'center',
     borderRadius: 22,
-    gap: 5,
-    height: 50,
+    gap: 3,
+    height: 46,
     justifyContent: 'center',
     minWidth: 0,
     overflow: 'hidden',
@@ -248,7 +250,7 @@ const styles = StyleSheet.create({
   label: {
     flexShrink: 1,
     fontFamily: 'Roboto_700Bold',
-    fontSize: 13,
+    fontSize: 11,
     includeFontPadding: false,
     letterSpacing: 0,
   },

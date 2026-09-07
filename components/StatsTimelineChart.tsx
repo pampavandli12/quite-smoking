@@ -1,183 +1,50 @@
+import { type AppTheme } from '@/app/theme';
+import { AppSymbol, type AppSymbolName } from '@/components/AppSymbol';
+import { SafeLineChart, type SafeChartPoint } from '@/components/SafeCharts';
+import { useAppMotion } from '@/hooks/useAppMotion';
 import {
-  getMonthlyBreakdown,
-  getPreviousWeekStats,
-  getSmokingCountByDateRange,
-  getWeeklyBreakdown,
-  getWeekStats,
-  getYearlyBreakdown,
-  getSmokingSettings,
-} from '@/db';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
+  calculateProgressAxisMax,
+  calculateProgressChartLayout,
+  formatProgressTooltip,
+  getProgressChartFullLabel,
+  getProgressChartLabels,
+} from '@/utils/progressChart';
+import {
+  getAverage,
+  getAverageLabel,
+  getComparisonLabel,
+  getPercentageChange,
+  getSavings,
+  getTotalLabel,
+  type SmokingBaseline,
+  type StatsPeriod,
+} from '@/utils/statistics';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
-import { Card, Icon, Surface, Text, useTheme } from 'react-native-paper';
+import { Card, Surface, Text, useTheme } from 'react-native-paper';
 
-export type StatsPeriod = 'week' | 'month' | 'year';
-
-export type TimelineSummary = {
-  average: number;
-  comparisonLabel: string;
-  currentTotal: number;
-  percentageChange: number;
-  period: StatsPeriod;
-  previousTotal: number;
-};
+export type { StatsPeriod } from '@/utils/statistics';
 
 type StatsTimelineChartProps = {
-  onSummaryChange?: (summary: TimelineSummary) => void;
+  chartData: number[];
+  currentTotal: number;
+  onPeriodChange: (period: StatsPeriod) => void;
+  period: StatsPeriod;
+  previousTotal: number;
+  smokingSettings: SmokingBaseline | null;
 };
-
-const EMPTY_DATA = [0];
-const MONTH_LABELS = ['W1', 'W2', 'W3', 'W4'];
-const WEEK_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const YEAR_LABELS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-function getRangeTotal(start: Date, end: Date) {
-  return getSmokingCountByDateRange(start.toISOString(), end.toISOString());
-}
-
-async function getPreviousMonthStats() {
-  const today = new Date();
-  const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const end = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    0,
-    23,
-    59,
-    59,
-    999,
-  );
-
-  return getRangeTotal(start, end);
-}
-
-async function getPreviousYearStats() {
-  const today = new Date();
-  const start = new Date(today.getFullYear() - 1, 0, 1);
-  const end = new Date(today.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
-
-  return getRangeTotal(start, end);
-}
-
-function getAverage(period: StatsPeriod, total: number) {
-  if (total <= 0) {
-    return 0;
-  }
-
-  if (period === 'week') {
-    return Math.round(total / 7);
-  }
-
-  if (period === 'month') {
-    return Math.round(total / 4);
-  }
-
-  return Math.round(total / 12);
-}
-
-function getComparisonLabel(period: StatsPeriod) {
-  if (period === 'week') {
-    return 'last week';
-  }
-
-  if (period === 'month') {
-    return 'last month';
-  }
-
-  return 'last year';
-}
-
-function getAverageLabel(period: StatsPeriod) {
-  if (period === 'week') {
-    return 'Daily Average';
-  }
-
-  if (period === 'month') {
-    return 'Weekly Average';
-  }
-
-  return 'Monthly Average';
-}
-
-function getTotalLabel(period: StatsPeriod) {
-  if (period === 'week') {
-    return 'Total This Week';
-  }
-
-  if (period === 'month') {
-    return 'Total This Month';
-  }
-
-  return 'Total This Year';
-}
-
-async function loadTimeline(period: StatsPeriod) {
-  if (period === 'week') {
-    const [currentTotal, previousTotal, data] = await Promise.all([
-      getWeekStats(),
-      getPreviousWeekStats(),
-      getWeeklyBreakdown(),
-    ]);
-
-    return { currentTotal, previousTotal, data };
-  }
-
-  if (period === 'month') {
-    const [data, previousTotal] = await Promise.all([
-      getMonthlyBreakdown(),
-      getPreviousMonthStats(),
-    ]);
-
-    return {
-      currentTotal: data.reduce((sum, value) => sum + value, 0),
-      previousTotal,
-      data,
-    };
-  }
-
-  const [data, previousTotal] = await Promise.all([
-    getYearlyBreakdown(),
-    getPreviousYearStats(),
-  ]);
-
-  return {
-    currentTotal: data.reduce((sum, value) => sum + value, 0),
-    previousTotal,
-    data,
-  };
-}
-
-function getChartLabels(period: StatsPeriod) {
-  if (period === 'week') {
-    return WEEK_LABELS;
-  }
-
-  if (period === 'month') {
-    return MONTH_LABELS;
-  }
-
-  return YEAR_LABELS;
-}
 
 type PeriodSelectorProps = {
   period: StatsPeriod;
@@ -196,21 +63,22 @@ function AnimatedPeriodSelector({
   onPeriodChange,
 }: PeriodSelectorProps) {
   const theme = useTheme();
-  const [layout, setLayout] = useState<{ width: number; x: number } | null>(
-    null,
-  );
+  const { reduceMotion } = useAppMotion();
+  const [width, setWidth] = useState(0);
   const selectedIndex = PERIODS.indexOf(period);
   const animatedPosition = useSharedValue(0);
 
   useEffect(() => {
-    if (layout) {
-      animatedPosition.value = withSpring(selectedIndex * (layout.width / 3), {
-        damping: 35,
-        mass: 1,
-        overshootClamping: false,
-      });
-    }
-  }, [selectedIndex, layout, animatedPosition]);
+    if (!width) return;
+    const target = selectedIndex * (width / PERIODS.length);
+    animatedPosition.value = reduceMotion
+      ? withTiming(target, { duration: 80 })
+      : withSpring(target, {
+          damping: 24,
+          mass: 0.8,
+          stiffness: 220,
+        });
+  }, [animatedPosition, reduceMotion, selectedIndex, width]);
 
   const animatedBackgroundStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: animatedPosition.value }],
@@ -219,53 +87,46 @@ function AnimatedPeriodSelector({
   return (
     <Surface
       style={[
-        styles.periodSelectorContainer,
-        {
-          backgroundColor: theme.colors.surfaceVariant,
-        },
+        styles.periodSelector,
+        { backgroundColor: theme.colors.surfaceVariant },
       ]}
       elevation={0}
     >
       <View
-        onLayout={(event) => {
-          const { width } = event.nativeEvent.layout;
-          setLayout({ width, x: 0 });
-        }}
-        style={styles.periodSelectorWrapper}
+        onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+        style={styles.periodSelectorTrack}
       >
-        {layout && (
+        {width > 0 && (
           <Animated.View
             style={[
-              styles.periodSelectorBackground,
+              styles.periodIndicator,
               {
-                width: layout.width / 3,
                 backgroundColor: theme.colors.primary,
+                width: width / PERIODS.length,
               },
               animatedBackgroundStyle,
             ]}
           />
         )}
-
-        {PERIODS.map((p) => (
+        {PERIODS.map((item) => (
           <Pressable
-            key={p}
-            onPress={() => onPeriodChange(p)}
+            accessibilityRole='tab'
+            accessibilityState={{ selected: item === period }}
+            key={item}
+            onPress={() => onPeriodChange(item)}
             style={styles.periodButton}
           >
             <Text
               variant='labelLarge'
-              style={[
-                styles.periodButtonText,
-                {
-                  color:
-                    p === period
-                      ? theme.colors.onPrimary
-                      : theme.colors.onSurfaceVariant,
-                  fontWeight: p === period ? '700' : '500',
-                },
-              ]}
+              style={{
+                color:
+                  item === period
+                    ? theme.colors.onPrimary
+                    : theme.colors.onSurfaceVariant,
+                fontWeight: item === period ? '700' : '500',
+              }}
             >
-              {PERIOD_LABELS[p]}
+              {PERIOD_LABELS[item]}
             </Text>
           </Pressable>
         ))}
@@ -274,464 +135,550 @@ function AnimatedPeriodSelector({
   );
 }
 
-export default function StatsTimelineChart({
-  onSummaryChange,
-}: StatsTimelineChartProps) {
+function SummaryCard({
+  accessibilityLabel,
+  icon,
+  label,
+  tone,
+  unit,
+  value,
+}: {
+  accessibilityLabel: string;
+  icon: AppSymbolName;
+  label: string;
+  tone: string;
+  unit: string;
+  value: number;
+}) {
   const theme = useTheme();
-  const { width } = useWindowDimensions();
-  const [period, setPeriod] = useState<StatsPeriod>('week');
-  const [currentTotal, setCurrentTotal] = useState(0);
-  const [previousTotal, setPreviousTotal] = useState(0);
-  const [chartData, setChartData] = useState<number[]>(EMPTY_DATA);
-  const [smokingSettings, setSmokingSettings] = useState<{
-    cigarettesPerDay: number;
-    costPerCigaretteCents: number;
-  } | null>(null);
+  return (
+    <Card
+      accessible
+      accessibilityLabel={accessibilityLabel}
+      mode='contained'
+      style={[
+        styles.summaryCard,
+        {
+          backgroundColor: theme.colors.elevation.level1,
+          borderColor: theme.colors.outlineVariant,
+        },
+      ]}
+    >
+      <Card.Content style={styles.summaryContent}>
+        <View style={styles.summaryHeading}>
+          <Text
+            numberOfLines={2}
+            variant='labelLarge'
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            {label}
+          </Text>
+          <AppSymbol name={icon} size={20} color={tone} />
+        </View>
+        <Text variant='headlineLarge' style={[styles.summaryValue, { color: tone }]}>
+          {value}
+        </Text>
+        <Text variant='bodySmall' style={{ color: theme.colors.onSurfaceVariant }}>
+          {unit}
+        </Text>
+      </Card.Content>
+    </Card>
+  );
+}
 
+function PointTooltip({
+  comparison,
+  item,
+}: {
+  comparison: string;
+  item?: SafeChartPoint;
+}) {
+  const theme = useTheme();
+  if (!item) return null;
+  const copy = formatProgressTooltip(
+    item.tooltipLabel ?? item.label ?? 'Period',
+    item.value,
+    comparison,
+  );
+  return (
+    <Surface
+      style={[
+        styles.tooltip,
+        {
+          backgroundColor: theme.colors.inverseSurface,
+          shadowColor: theme.colors.shadow,
+        },
+      ]}
+      elevation={3}
+    >
+      <Text variant='labelMedium' style={{ color: theme.colors.inverseOnSurface }}>
+        {copy.title}
+      </Text>
+      <Text
+        variant='titleSmall'
+        style={[styles.tooltipValue, { color: theme.colors.inverseOnSurface }]}
+      >
+        {copy.value}
+      </Text>
+      <Text
+        numberOfLines={1}
+        variant='bodySmall'
+        style={{ color: theme.colors.inverseOnSurface, opacity: 0.72 }}
+      >
+        {copy.comparison}
+      </Text>
+    </Surface>
+  );
+}
+
+export default function StatsTimelineChart({
+  chartData,
+  currentTotal,
+  onPeriodChange,
+  period,
+  previousTotal,
+  smokingSettings,
+}: StatsTimelineChartProps) {
+  const theme = useTheme<AppTheme>();
+  const { width: windowWidth } = useWindowDimensions();
+  const { reduceMotion } = useAppMotion();
+  const [chartWidth, setChartWidth] = useState(0);
   const average = getAverage(period, currentTotal);
   const comparisonLabel = getComparisonLabel(period);
-  const percentageChange =
+  const percentageChange = getPercentageChange(currentTotal, previousTotal);
+  const { cigarettesSaved, moneySaved } = getSavings(
+    smokingSettings,
+    period,
+    currentTotal,
+  );
+  const labels = useMemo(
+    () => getProgressChartLabels(period, chartWidth),
+    [chartWidth, period],
+  );
+  const data = useMemo<SafeChartPoint[]>(
+    () =>
+      chartData.map((value, index) => {
+        const fullLabel = getProgressChartFullLabel(period, index);
+        return {
+          value,
+          label: labels[index] ?? '',
+          tooltipLabel: fullLabel,
+          accessibilityLabel: `${fullLabel}: ${value} ${
+            value === 1 ? 'cigarette' : 'cigarettes'
+          }`,
+        };
+      }),
+    [chartData, labels, period],
+  );
+  const chartLayout = calculateProgressChartLayout(chartWidth, data.length);
+  const axisMaximum = calculateProgressAxisMax(chartData);
+  const hasData = chartData.some((value) => value > 0);
+  const comparisonCopy =
     previousTotal > 0
-      ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
-      : 0;
-
-  // Calculate money saved
-  let moneySaved = 0;
-  let cigarettesSaved = 0;
-
-  if (smokingSettings) {
-    let cigarettesIfNormal = 0;
-
-    if (period === 'week') {
-      cigarettesIfNormal = smokingSettings.cigarettesPerDay * 7;
-    } else if (period === 'month') {
-      const today = new Date();
-      const daysInMonth = new Date(
-        today.getFullYear(),
-        today.getMonth() + 1,
-        0,
-      ).getDate();
-      cigarettesIfNormal = smokingSettings.cigarettesPerDay * daysInMonth;
-    } else {
-      cigarettesIfNormal = smokingSettings.cigarettesPerDay * 365;
-    }
-
-    // Can be negative if smoking more than normal
-    cigarettesSaved = cigarettesIfNormal - currentTotal;
-    moneySaved = Math.round(
-      (cigarettesSaved * smokingSettings.costPerCigaretteCents) / 100,
-    );
-  }
-
+      ? `${Math.abs(percentageChange)}% ${
+          percentageChange <= 0 ? 'lower' : 'higher'
+        } than ${comparisonLabel}`
+      : `No complete ${comparisonLabel} comparison yet`;
+  const timelineSummary = data
+    .map((item) => item.accessibilityLabel)
+    .filter(Boolean)
+    .join(', ');
   const costPerCigaretteDisplay =
-    smokingSettings && smokingSettings.costPerCigaretteCents
+    smokingSettings?.costPerCigaretteCents
       ? (smokingSettings.costPerCigaretteCents / 100).toFixed(2)
       : '0.00';
+  const stackSummaryCards = windowWidth < 350;
 
-  const summary = useMemo(
-    () => ({
-      average,
-      comparisonLabel,
-      currentTotal,
-      percentageChange,
-      period,
-      previousTotal,
-    }),
-    [
-      average,
-      comparisonLabel,
-      currentTotal,
-      percentageChange,
-      period,
-      previousTotal,
-    ],
-  );
-
-  const loadChart = useCallback(async () => {
-    try {
-      const timeline = await loadTimeline(period);
-      setCurrentTotal(timeline.currentTotal);
-      setPreviousTotal(timeline.previousTotal);
-      setChartData(timeline.data);
-    } catch (error) {
-      console.error('Error loading timeline chart:', error);
-      setCurrentTotal(0);
-      setPreviousTotal(0);
-      setChartData(EMPTY_DATA);
-    }
-  }, [period]);
-
-  useEffect(() => {
-    loadChart();
-  }, [loadChart]);
-
-  // Load smoking settings
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const settings = await getSmokingSettings();
-        if (settings) {
-          setSmokingSettings(settings);
-        }
-      } catch (error) {
-        console.error('Error loading smoking settings:', error);
-      }
-    };
-
-    loadSettings();
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadChart();
-    }, [loadChart]),
-  );
-
-  useEffect(() => {
-    onSummaryChange?.(summary);
-  }, [onSummaryChange, summary]);
-
-  const chartConfig = {
-    backgroundColor: theme.colors.surface,
-    backgroundGradientFrom: theme.colors.surface,
-    backgroundGradientTo: theme.colors.surface,
-    decimalPlaces: 0,
-    color: (opacity = 1) => {
-      const primary = theme.colors.primary;
-      return `${primary}${Math.round(opacity * 255)
-        .toString(16)
-        .padStart(2, '0')}`;
-    },
-    labelColor: () => theme.colors.onSurface,
-    strokeWidth: 3,
-    propsForBackgroundLines: {
-      stroke: 'transparent',
-    },
-    propsForLabels: {
-      fontSize: period === 'year' ? 10 : 11,
-      fontWeight: '400',
-    },
-    propsForDots: {
-      r: '5',
-      strokeWidth: '3',
-      stroke: theme.colors.primary,
-      fill: theme.colors.surface,
-    },
-  };
-
-  const data = {
-    labels: getChartLabels(period),
-    datasets: [
-      {
-        data: chartData.length > 0 ? chartData : EMPTY_DATA,
-      },
-    ],
+  const handleChartLayout = (event: LayoutChangeEvent) => {
+    setChartWidth(Math.floor(event.nativeEvent.layout.width));
   };
 
   return (
     <>
-      <AnimatedPeriodSelector period={period} onPeriodChange={setPeriod} />
+      <AnimatedPeriodSelector period={period} onPeriodChange={onPeriodChange} />
 
-      {/* Money Saved Card */}
-      {smokingSettings &&
-        (currentTotal > 0 || chartData.some((v) => v > 0)) && (
-          <Card
+      <View
+        style={[
+          styles.summaryRow,
+          stackSummaryCards && styles.summaryRowStacked,
+        ]}
+      >
+        <SummaryCard
+          accessibilityLabel={`${average} cigarettes ${getAverageLabel(period).toLowerCase()}`}
+          icon='chart-line'
+          label={getAverageLabel(period)}
+          tone={theme.colors.secondary}
+          unit={average === 1 ? 'cigarette' : 'cigarettes'}
+          value={average}
+        />
+        <SummaryCard
+          accessibilityLabel={`${currentTotal} cigarettes ${getTotalLabel(period).toLowerCase()}`}
+          icon='counter'
+          label={getTotalLabel(period)}
+          tone={theme.colors.primary}
+          unit={currentTotal === 1 ? 'cigarette' : 'cigarettes'}
+          value={currentTotal}
+        />
+      </View>
+
+      {smokingSettings && (currentTotal > 0 || hasData) && (
+        <Card
+          mode='contained'
+          style={[
+            styles.savingsCard,
+            {
+              backgroundColor:
+                moneySaved >= 0
+                  ? theme.appColors.successContainer
+                  : theme.appColors.warningContainer,
+              borderColor: theme.colors.outlineVariant,
+            },
+          ]}
+        >
+          <Card.Content style={styles.savingsContent}>
+            <View
+              style={[
+                styles.savingsIcon,
+                {
+                  backgroundColor:
+                    moneySaved >= 0
+                      ? theme.appColors.success
+                      : theme.appColors.warning,
+                },
+              ]}
+            >
+              <AppSymbol
+                name='wallet-outline'
+                size={28}
+                color={theme.colors.surface}
+              />
+            </View>
+            <View style={styles.savingsCopy}>
+              <Text variant='labelLarge' style={{ color: theme.colors.onSurfaceVariant }}>
+                {moneySaved >= 0 ? 'Estimated savings' : 'Above baseline'} ·{' '}
+                {PERIOD_LABELS[period]}
+              </Text>
+              <Text
+                adjustsFontSizeToFit
+                numberOfLines={1}
+                variant='headlineLarge'
+                style={[
+                  styles.savingsValue,
+                  {
+                    color:
+                      moneySaved >= 0
+                        ? theme.appColors.success
+                        : theme.appColors.warning,
+                  },
+                ]}
+              >
+                {moneySaved >= 0 ? '₹' : '-₹'}
+                {Math.abs(moneySaved)}
+              </Text>
+              <Text variant='bodySmall' style={{ color: theme.colors.onSurfaceVariant }}>
+                ₹{costPerCigaretteDisplay} × {Math.abs(cigarettesSaved)}{' '}
+                {moneySaved >= 0 ? 'avoided' : 'above baseline'}
+              </Text>
+            </View>
+          </Card.Content>
+        </Card>
+      )}
+
+      <Surface
+        accessible
+        accessibilityLabel={`Smoking timeline. ${timelineSummary || 'No recorded values.'}`}
+        onLayout={handleChartLayout}
+        style={[
+          styles.chartCard,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.outlineVariant,
+          },
+        ]}
+        elevation={0}
+      >
+        <View style={styles.chartHeading}>
+          <View style={styles.chartHeadingCopy}>
+            <Text variant='titleMedium' style={styles.chartTitle}>
+              Smoking timeline
+            </Text>
+            <Text variant='bodySmall' style={{ color: theme.colors.onSurfaceVariant }}>
+              {period === 'week'
+                ? 'Daily totals this week'
+                : period === 'month'
+                  ? 'Weekly totals this month'
+                  : 'Monthly totals this year'}
+            </Text>
+          </View>
+          <View
             style={[
-              styles.moneySavedCard,
-              {
-                backgroundColor:
-                  moneySaved >= 0
-                    ? theme.dark
-                      ? 'rgba(76, 175, 80, 0.15)'
-                      : '#E8F5E9'
-                    : theme.dark
-                      ? 'rgba(244, 67, 54, 0.15)'
-                      : '#FFEBEE',
-                marginBottom: 24,
-              },
+              styles.chartIcon,
+              { backgroundColor: theme.colors.secondaryContainer },
             ]}
           >
-            <Card.Content>
-              <View style={styles.moneySavedContent}>
-                <Surface
-                  style={[
-                    styles.moneySavedIconContainer,
-                    {
-                      backgroundColor:
-                        moneySaved >= 0 ? theme.colors.primary : '#F44336',
-                    },
-                  ]}
-                  elevation={0}
-                >
-                  <Text style={styles.moneySavedIcon}>
-                    <Icon
-                      source='cash'
-                      size={40}
-                      color={
-                        theme.dark
-                          ? theme.colors.onPrimary
-                          : theme.colors.surface
-                      }
-                    />
-                  </Text>
-                </Surface>
+            <AppSymbol
+              name='chart-timeline-variant'
+              size={21}
+              color={theme.colors.secondary}
+            />
+          </View>
+        </View>
 
-                <View style={styles.moneySavedTextContainer}>
-                  <Text
-                    variant='bodyMedium'
-                    style={[
-                      styles.moneySavedLabel,
-                      { color: theme.colors.onSurface, opacity: 0.8 },
-                    ]}
-                  >
-                    {moneySaved >= 0 ? 'Money Saved' : 'Money Spent'}{' '}
-                    {period === 'week'
-                      ? 'This Week'
-                      : period === 'month'
-                        ? 'This Month'
-                        : 'This Year'}
-                  </Text>
-                  <Text
-                    variant='displaySmall'
-                    style={[
-                      styles.moneySavedAmount,
-                      {
-                        color:
-                          moneySaved >= 0 ? theme.colors.primary : '#F44336',
-                      },
-                    ]}
-                  >
-                    {moneySaved >= 0 ? '₹' : '-₹'}
-                    {Math.abs(moneySaved)}
-                  </Text>
-                  <Text
-                    variant='bodySmall'
-                    style={[
-                      styles.moneySavedFormula,
-                      { color: theme.colors.onSurfaceVariant, opacity: 0.7 },
-                    ]}
-                  >
-                    ₹{costPerCigaretteDisplay}/cigarette ×{' '}
-                    {moneySaved >= 0 ? '' : '+'}
-                    {Math.abs(cigarettesSaved)}{' '}
-                    {moneySaved >= 0 ? 'avoided' : 'extra'}
-                  </Text>
-                </View>
-              </View>
-            </Card.Content>
-          </Card>
+        {!hasData ? (
+          <View style={styles.chartEmpty}>
+            <View
+              style={[
+                styles.emptyIcon,
+                { backgroundColor: theme.colors.surfaceVariant },
+              ]}
+            >
+              <AppSymbol
+                name='chart-line-variant'
+                size={28}
+                color={theme.colors.secondary}
+              />
+            </View>
+            <Text variant='titleSmall' style={styles.emptyTitle}>
+              Not enough data yet
+            </Text>
+            <Text
+              variant='bodySmall'
+              style={[styles.emptyMessage, { color: theme.colors.onSurfaceVariant }]}
+            >
+              Recorded moments will form a trend here.
+            </Text>
+          </View>
+        ) : data.length === 1 ? (
+          <View style={styles.chartEmpty}>
+            <Text
+              variant='displaySmall'
+              style={[styles.singleValue, { color: theme.colors.primary }]}
+            >
+              {data[0].value}
+            </Text>
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>
+              {data[0].tooltipLabel} · keep recording to build a trend
+            </Text>
+          </View>
+        ) : chartWidth > 0 ? (
+          <SafeLineChart
+            animationDuration={220}
+            areaChart
+            color={theme.colors.secondary}
+            curvature={0.16}
+            curved
+            data={data}
+            dataPointsColor={theme.colors.primary}
+            dataPointsRadius={4}
+            disableScroll
+            endFillColor={theme.colors.surface}
+            endOpacity={0}
+            endSpacing={chartLayout.endSpacing}
+            formatYLabel={(label) => String(Math.round(Number(label)))}
+            height={220}
+            hideRules={false}
+            initialSpacing={chartLayout.initialSpacing}
+            isAnimated={!reduceMotion}
+            maxValue={axisMaximum}
+            noOfSections={4}
+            pointerConfig={{
+              activatePointersOnLongPress: false,
+              autoAdjustPointerLabelPosition: true,
+              pointerColor: theme.colors.primary,
+              pointerLabelComponent: (items) => (
+                <PointTooltip comparison={comparisonCopy} item={items[0]} />
+              ),
+              pointerLabelHeight: 78,
+              pointerLabelWidth: 166,
+              pointerStripColor: theme.colors.outline,
+              pointerStripHeight: 184,
+              pointerStripWidth: 1,
+              radius: 6,
+            }}
+            rulesColor={theme.colors.outlineVariant}
+            showVerticalLines={false}
+            spacing={chartLayout.spacing}
+            startFillColor={theme.colors.secondaryContainer}
+            startOpacity={theme.dark ? 0.22 : 0.34}
+            thickness={3}
+            width={chartLayout.plotWidth}
+            xAxisLabelTextStyle={{
+              color: theme.colors.onSurfaceVariant,
+              fontSize: period === 'year' ? 9 : 11,
+            }}
+            xAxisThickness={0}
+            yAxisTextStyle={{ color: theme.colors.onSurfaceVariant, fontSize: 11 }}
+            yAxisThickness={0}
+          />
+        ) : (
+          <View style={styles.chartPlaceholder} />
         )}
-
-      <Surface style={styles.chartContainer} elevation={0}>
-        <LineChart
-          data={data}
-          width={width + 16}
-          height={240}
-          chartConfig={chartConfig}
-          style={styles.chart}
-          bezier
-          withDots
-          withShadow={false}
-          withInnerLines={false}
-          withOuterLines={false}
-          withVerticalLines={false}
-          withHorizontalLines={false}
-          withVerticalLabels
-          withHorizontalLabels
-          segments={4}
-          fromZero
-          yAxisSuffix=''
-        />
-      </Surface>
-
-      <Surface style={styles.statsRow} elevation={0}>
-        <Card style={styles.statCardHalf}>
-          <Card.Content>
-            <Text variant='bodyMedium' style={styles.statLabel}>
-              {getAverageLabel(period)}
-            </Text>
-            <Surface style={styles.statValueRow} elevation={0}>
-              <Text variant='headlineLarge' style={styles.statNumber}>
-                {average}
-              </Text>
-              <Text variant='bodyMedium'>
-                {' '}
-                {average === 1 ? 'cigarette' : 'cigarettes'}
-              </Text>
-            </Surface>
-            {previousTotal > 0 && (
-              <Surface style={styles.changeRow} elevation={0}>
-                <Icon
-                  source={
-                    percentageChange < 0 ? 'trending-down' : 'trending-up'
-                  }
-                  size={16}
-                  color={percentageChange < 0 ? '#4CAF50' : '#F44336'}
-                />
-                <Text
-                  variant='bodySmall'
-                  style={
-                    percentageChange < 0
-                      ? styles.changeTextGreen
-                      : styles.changeTextRed
-                  }
-                >
-                  {percentageChange > 0 ? '+' : ''}
-                  {percentageChange}% vs {comparisonLabel}
-                </Text>
-              </Surface>
-            )}
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.statCardHalf}>
-          <Card.Content>
-            <Text variant='bodyMedium' style={styles.statLabel}>
-              {getTotalLabel(period)}
-            </Text>
-            <Surface style={styles.statValueRow} elevation={0}>
-              <Text variant='headlineLarge' style={styles.statNumber}>
-                {currentTotal}
-              </Text>
-              <Text variant='bodyMedium'>
-                {' '}
-                {currentTotal === 1 ? 'cigarette' : 'cigarettes'}
-              </Text>
-            </Surface>
-            {previousTotal > 0 && (
-              <Surface style={styles.changeRow} elevation={0}>
-                <Icon
-                  source={
-                    percentageChange < 0 ? 'trending-down' : 'trending-up'
-                  }
-                  size={16}
-                  color={percentageChange < 0 ? '#4CAF50' : '#F44336'}
-                />
-                <Text
-                  variant='bodySmall'
-                  style={
-                    percentageChange < 0
-                      ? styles.changeTextGreen
-                      : styles.changeTextRed
-                  }
-                >
-                  {percentageChange > 0 ? '+' : ''}
-                  {percentageChange}% vs {comparisonLabel}
-                </Text>
-              </Surface>
-            )}
-          </Card.Content>
-        </Card>
+        {hasData && data.length > 1 && (
+          <Text
+            variant='bodySmall'
+            style={[styles.chartHint, { color: theme.colors.onSurfaceVariant }]}
+          >
+            Touch and drag across the line to explore values.
+          </Text>
+        )}
       </Surface>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  periodSelectorContainer: {
-    marginBottom: 20,
+  periodSelector: {
     borderRadius: 20,
-    padding: 4,
+    marginBottom: 16,
     overflow: 'hidden',
+    padding: 4,
   },
-  periodSelectorWrapper: {
+  periodSelectorTrack: {
     flexDirection: 'row',
-    height: 40,
+    height: 44,
     position: 'relative',
   },
-  periodSelectorBackground: {
-    position: 'absolute',
-    height: 40,
+  periodIndicator: {
     borderRadius: 16,
-    top: 0,
+    bottom: 0,
     left: 0,
+    position: 'absolute',
+    top: 0,
   },
   periodButton: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 16,
+    minHeight: 44,
   },
-  periodButtonText: {
-    textAlign: 'center',
-  },
-  chartContainer: {
-    marginBottom: 24,
-    marginHorizontal: -16,
-    borderRadius: 0,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-  },
-  chart: {
-    marginLeft: -16,
-    marginRight: -16,
-    borderRadius: 0,
-  },
-  statsRow: {
+  summaryRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
-    backgroundColor: 'transparent',
+    marginBottom: 12,
   },
-  statCardHalf: {
+  summaryRowStacked: {
+    flexDirection: 'column',
+  },
+  summaryCard: {
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
     flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
   },
-  statLabel: {
-    marginBottom: 8,
-    opacity: 0.7,
+  summaryContent: {
+    minHeight: 126,
+    paddingVertical: 14,
   },
-  statValueRow: {
+  summaryHeading: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 8,
-    backgroundColor: 'transparent',
+    gap: 8,
+    justifyContent: 'space-between',
+    minHeight: 38,
   },
-  statNumber: {
-    fontWeight: 'bold',
+  summaryValue: {
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
+    marginTop: 2,
   },
-  changeRow: {
-    flexDirection: 'row',
+  savingsCard: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  savingsContent: {
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'transparent',
-  },
-  changeTextGreen: {
-    color: '#4CAF50',
-  },
-  changeTextRed: {
-    color: '#F44336',
-  },
-  moneySavedCard: {
-    borderRadius: 16,
-    marginBottom: 24,
-  },
-  moneySavedContent: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+    gap: 14,
   },
-  moneySavedIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  savingsIcon: {
+    alignItems: 'center',
+    borderRadius: 20,
+    height: 54,
     justifyContent: 'center',
-    alignItems: 'center',
+    width: 54,
   },
-  moneySavedIcon: {
-    fontSize: 28,
-  },
-  moneySavedTextContainer: {
+  savingsCopy: {
     flex: 1,
+    minWidth: 0,
   },
-  moneySavedLabel: {
-    marginBottom: 4,
-    fontWeight: '500',
+  savingsValue: {
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
   },
-  moneySavedAmount: {
+  chartCard: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 24,
+    overflow: 'hidden',
+    paddingBottom: 14,
+    paddingHorizontal: 8,
+    paddingTop: 18,
+  },
+  chartHeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    paddingHorizontal: 10,
+  },
+  chartHeadingCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  chartTitle: {
     fontWeight: '700',
-    marginBottom: 4,
   },
-  moneySavedFormula: {
-    fontWeight: '400',
+  chartIcon: {
+    alignItems: 'center',
+    borderRadius: 16,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  chartEmpty: {
+    alignItems: 'center',
+    height: 220,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  emptyIcon: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 56,
+    justifyContent: 'center',
+    marginBottom: 12,
+    width: 56,
+  },
+  emptyTitle: {
+    fontWeight: '700',
+  },
+  emptyMessage: {
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  singleValue: {
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
+  },
+  chartPlaceholder: {
+    height: 220,
+  },
+  chartHint: {
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    textAlign: 'center',
+  },
+  tooltip: {
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    width: 166,
+  },
+  tooltipValue: {
+    fontWeight: '700',
+    marginVertical: 1,
   },
 });
