@@ -3,6 +3,7 @@ import {
   calculateProgressChartLayout,
   formatProgressTooltip,
   getProgressChartLabels,
+  getProgressChartVerticalLayout,
 } from '@/utils/progressChart';
 
 describe('progress chart presentation helpers', () => {
@@ -51,5 +52,15 @@ describe('progress chart presentation helpers', () => {
       value: '2 cigarettes',
       comparison: 'vs last week',
     });
+  });
+
+  it('reserves enough vertical space for axis labels and data points', () => {
+    const layout = getProgressChartVerticalLayout();
+
+    expect(layout.plotHeight).toBeGreaterThan(160);
+    expect(layout.overflowBottom).toBeGreaterThanOrEqual(layout.dataPointRadius);
+    expect(layout.xAxisLabelsHeight).toBeGreaterThanOrEqual(18);
+    expect(layout.labelsExtraHeight).toBeGreaterThan(0);
+    expect(layout.pointerStripHeight).toBeLessThan(layout.plotHeight);
   });
 });

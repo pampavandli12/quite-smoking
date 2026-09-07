@@ -1,4 +1,4 @@
-import { type AppTheme } from '@/app/theme';
+import { type AppTheme } from '@/theme';
 import {
   AppSymbol,
   appSymbolSource,

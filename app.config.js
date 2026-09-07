@@ -1,3 +1,10 @@
+const DEV_REVENUECAT_ANDROID_API_KEY = 'test_rGcJzBvPICvxCewJbeUyPjmGKeO';
+
+if (!process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY) {
+  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY =
+    DEV_REVENUECAT_ANDROID_API_KEY;
+}
+
 export default ({ config }) => ({
   expo: {
     name: 'Quit Smoking',

@@ -12,7 +12,7 @@ import { Button, PaperProvider, Text } from "react-native-paper";
 import { AppSymbol, appSymbolSource } from "../components/AppSymbol";
 import { initializeDatabase } from "../db/client";
 import PurchaseService from "../services/purchases";
-import { darkTheme, lightTheme } from "./theme";
+import { darkTheme, lightTheme } from '@/theme';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
