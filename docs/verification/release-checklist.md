@@ -29,6 +29,13 @@ Use this checklist for a release candidate built from a clean checkout.
       `androidx.compose.ui.tooling.PreviewActivity`.
 - [ ] The final AAB certificate is the EAS upload key accepted by Play App
       Signing; never upload a locally debug-signed artifact.
+- [ ] Release builds enable R8 minify and resource shrinking via
+      `expo-build-properties` in `app.config.js`.
+- [ ] The release `build.gradle` uses `proguard-android-optimize.txt`.
+- [ ] Download `mapping.txt` from the EAS build artifacts and upload it to Play
+      Console for deobfuscated crash reports.
+- [ ] Play Console app optimization (obfuscation/shrinking) is above 25% on the
+      uploaded release candidate.
 
 ## Upgrade and data
 
@@ -44,6 +51,8 @@ Use this checklist for a release candidate built from a clean checkout.
 - [ ] Active subscribers route to Home.
 - [ ] Inactive users see the existing paywall.
 - [ ] Purchase cancellation, failure, success, and restore show existing alerts.
+- [ ] Validate purchase and restore on a `production`-profile release build
+      after R8 is enabled; add keep rules if RevenueCat or billing crashes.
 - [ ] Subscription cancellation is reachable from Settings.
 - [ ] Log with a trigger and without a trigger.
 - [ ] Rescue logging, history edits, and plan changes refresh Home on focus.

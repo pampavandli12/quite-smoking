@@ -1,3 +1,5 @@
+const androidReleaseProguardRules = require('./plugins/androidReleaseProguardRules');
+
 const DEV_REVENUECAT_ANDROID_API_KEY = 'test_rGcJzBvPICvxCewJbeUyPjmGKeO';
 
 if (!process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY) {
@@ -65,6 +67,17 @@ export default ({ config }) => ({
         'expo-dev-client',
         {
           addGeneratedScheme: false,
+        },
+      ],
+      [
+        'expo-build-properties',
+        {
+          android: {
+            enableMinifyInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+            enablePngCrunchInReleaseBuilds: true,
+            extraProguardRules: androidReleaseProguardRules,
+          },
         },
       ],
       './plugins/withAndroidReleaseHardening',
