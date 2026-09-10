@@ -3,6 +3,6 @@ export const URL_LINKS = {
   feedback: 'contact@dailyapplabs.com',
   googlePlaySubscriptions:
     'https://play.google.com/store/account/subscriptions?package=com.dailyapplabs.quitsmoke',
-  terms: 'https://dailyapplabs.com/terms-and-conditions',
-  privacy: 'https://dailyapplabs.com/privacy-policy',
+  terms: 'https://dailyapplabs.com/terms-and-conditions/smoke-tracker',
+  privacy: 'https://dailyapplabs.com/privacy-policy/smoke-tracker',
 };

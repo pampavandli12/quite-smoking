@@ -42,7 +42,10 @@ export const appSymbolCatalog = {
   'credit-card-outline': { sf: 'creditcard', fallback: 'credit-card-outline' },
   crown: { sf: 'crown', sfFilled: 'crown.fill', fallback: 'crown-outline', fallbackFilled: 'crown' },
   'crown-outline': { sf: 'crown', fallback: 'crown-outline' },
+  'currency-cad': { sf: 'dollarsign.circle', fallback: 'currency-usd' },
+  'currency-gbp': { sf: 'sterlingsign', fallback: 'currency-gbp' },
   'currency-inr': { sf: 'indianrupeesign', fallback: 'currency-inr' },
+  'currency-usd': { sf: 'dollarsign', fallback: 'currency-usd' },
   'database-alert': { sf: 'externaldrive.badge.exclamationmark', fallback: 'database-alert' },
   'database-remove-outline': {
     sf: 'externaldrive.badge.minus',

@@ -1,6 +1,7 @@
 import { getSmokingSettings } from '@/db';
 import { type AppTheme } from '@/theme';
 import { AppSymbol, type AppSymbolName } from '@/components/AppSymbol';
+import { CurrencyPicker } from '@/components/CurrencyPicker';
 import {
   PremiumCard,
   ScreenContainer,
@@ -17,9 +18,16 @@ import {
 } from '@/services/notificationService';
 import {
   getUserPreferences,
+  saveCurrencyPreference,
   saveUserPreferences,
   type MotionPreference,
 } from '@/services/preferencesService';
+import {
+  CURRENCY_LABELS,
+  detectCurrencyFromDevice,
+  formatMoneyFromCents,
+  type CurrencyCode,
+} from '@/utils/currency';
 import { exportWeeklyReport } from '@/services/reportService';
 import { URL_LINKS } from '@/utils/constants';
 import { useFocusEffect } from '@react-navigation/native';
@@ -90,6 +98,10 @@ export default function SettingsPage() {
   const [purchaseSupportId, setPurchaseSupportId] = useState<string | null>(
     null,
   );
+  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(
+    detectCurrencyFromDevice(),
+  );
+  const [currencySaving, setCurrencySaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -104,11 +116,13 @@ export default function SettingsPage() {
       setNotificationsEnabled(notifications?.enabled === 1);
       setHapticsEnabled(preferences.hapticsEnabled);
       setMotionPreference(preferences.motionPreference);
+      setCurrencyCode(preferences.currencyCode);
       setBaseline(
         settings
-          ? `${settings.cigarettesPerDay}/day · ₹${(
-              settings.costPerCigaretteCents / 100
-            ).toFixed(2)} each`
+          ? `${settings.cigarettesPerDay}/day · ${formatMoneyFromCents(
+              settings.costPerCigaretteCents,
+              preferences.currencyCode,
+            )} each`
           : 'Not configured',
       );
       setAccessTier(access.tier);
@@ -133,9 +147,11 @@ export default function SettingsPage() {
   ) => {
     setMotionPreference(nextMotion);
     setHapticsEnabled(nextHaptics);
+    const current = await getUserPreferences();
     const result = await saveUserPreferences({
       motionPreference: nextMotion,
       hapticsEnabled: nextHaptics,
+      currencyCode: current.currencyCode,
     });
     if (!result.success) Alert.alert('Could not save preference', 'Please try again.');
   };
@@ -168,6 +184,20 @@ export default function SettingsPage() {
     Platform.OS === 'ios'
       ? URL_LINKS.appStoreSubscriptions
       : URL_LINKS.googlePlaySubscriptions;
+
+  const handleCurrencyChange = async (code: CurrencyCode) => {
+    if (code === currencyCode || currencySaving) return;
+
+    setCurrencySaving(true);
+    const result = await saveCurrencyPreference(code);
+    if (result.success) {
+      setCurrencyCode(code);
+      await load();
+    } else {
+      Alert.alert('Could not save currency', 'Please try again.');
+    }
+    setCurrencySaving(false);
+  };
 
   const requestPurchaseDataDeletion = () => {
     const identifierCopy = purchaseSupportId
@@ -244,6 +274,18 @@ export default function SettingsPage() {
 
       <SectionHeader title='Preferences' />
       <PremiumCard>
+        <View style={styles.currency}>
+          <Text variant='titleSmall'>Currency</Text>
+          <Text variant='bodySmall' style={{ color: theme.colors.onSurfaceVariant }}>
+            Savings and cost estimates use {CURRENCY_LABELS[currencyCode]}.
+          </Text>
+          <CurrencyPicker
+            disabled={currencySaving}
+            onChange={handleCurrencyChange}
+            value={currencyCode}
+          />
+        </View>
+        <Divider />
         <SettingsRow
           icon='vibrate'
           label='Haptic feedback'
@@ -319,6 +361,7 @@ const styles = StyleSheet.create({
   crown: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   row: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   rowIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  currency: { paddingBottom: 6, paddingTop: 14 },
   motion: { paddingVertical: 14 },
   motionControl: { marginTop: 12 },
   disclaimer: {

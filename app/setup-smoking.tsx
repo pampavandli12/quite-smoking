@@ -1,13 +1,23 @@
+import { CurrencyPicker } from '@/components/CurrencyPicker';
 import {
   AnimatedPressable,
   PremiumCard,
   ScreenContainer,
   StatusPill,
 } from '@/components/ui';
-import { AppSymbol, appSymbolSource } from '@/components/AppSymbol';
+import { AppSymbol } from '@/components/AppSymbol';
 import { setSmokingSettings } from '@/db/queries';
+import {
+  getUserPreferences,
+  saveCurrencyPreference,
+} from '@/services/preferencesService';
+import {
+  detectCurrencyFromDevice,
+  getCurrencySymbolName,
+  type CurrencyCode,
+} from '@/utils/currency';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import {
@@ -22,6 +32,23 @@ export default function SmokingSetupScreen() {
   const [costPerCigarette, setCostPerCigarette] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(
+    detectCurrencyFromDevice(),
+  );
+  const userChangedCurrency = useRef(false);
+
+  useEffect(() => {
+    void getUserPreferences().then((preferences) => {
+      if (!userChangedCurrency.current) {
+        setCurrencyCode(preferences.currencyCode);
+      }
+    });
+  }, []);
+
+  const handleCurrencyChange = (code: CurrencyCode) => {
+    userChangedCurrency.current = true;
+    setCurrencyCode(code);
+  };
   const dailyCountValid = Number(cigarettesPerDay) > 0;
   const allValid = useMemo(
     () => areSmokingSettingsValid(cigarettesPerDay, costPerCigarette),
@@ -37,6 +64,11 @@ export default function SmokingSetupScreen() {
     setMessage('');
     try {
       const parsed = parseSmokingSettings(cigarettesPerDay, costPerCigarette);
+      const currencyResult = await saveCurrencyPreference(currencyCode);
+      if (!currencyResult.success) {
+        setMessage('We could not save your currency. Please try again.');
+        return;
+      }
       const result = await setSmokingSettings(
         parsed.cigarettesPerDay,
         parsed.costPerCigarette,
@@ -144,15 +176,37 @@ export default function SmokingSetupScreen() {
             <>
               <AppSymbol name='wallet-outline' size={28} color={theme.colors.primary} />
               <Text variant='titleLarge' style={styles.cardTitle}>
-                Cost per cigarette
+                Cost and currency
               </Text>
               <Text style={{ color: theme.colors.onSurfaceVariant }}>
-                Use your usual average. Your currency can be updated in Settings.
+                Pick your currency, then enter what you usually pay per cigarette.
+              </Text>
+              <Text variant='titleSmall' style={styles.fieldLabel}>
+                Currency
+              </Text>
+              <CurrencyPicker
+                disabled={saving}
+                onChange={handleCurrencyChange}
+                value={currencyCode}
+              />
+              <Text variant='titleSmall' style={styles.fieldLabel}>
+                Cost per cigarette
               </Text>
               <TextInput
+                key={currencyCode}
                 accessibilityLabel='Cost per cigarette'
                 keyboardType='decimal-pad'
-                left={<TextInput.Icon icon={appSymbolSource('currency-inr')} />}
+                left={
+                  <TextInput.Icon
+                    icon={({ size, color }) => (
+                      <AppSymbol
+                        name={getCurrencySymbolName(currencyCode)}
+                        size={size}
+                        color={color}
+                      />
+                    )}
+                  />
+                }
                 mode='outlined'
                 onChangeText={(value) => setCostPerCigarette(value.replace(/[^0-9.]/g, ''))}
                 placeholder='0.00'
@@ -214,7 +268,8 @@ const styles = StyleSheet.create({
   counter: { alignItems: 'center', flexDirection: 'row', gap: 14, justifyContent: 'center', marginTop: 24 },
   counterButton: { alignItems: 'center', borderRadius: 999, borderWidth: 1, height: 52, justifyContent: 'center', width: 52 },
   numberInput: { fontSize: 28, fontWeight: '700', height: 60, textAlign: 'center', width: 110 },
-  costInput: { marginTop: 24 },
+  fieldLabel: { fontWeight: '600', marginBottom: 4, marginTop: 18 },
+  costInput: { marginTop: 4 },
   message: { marginTop: 12, textAlign: 'center' },
   actions: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 22 },
   primary: { borderRadius: 999, flex: 1 },

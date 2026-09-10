@@ -1,6 +1,8 @@
 import { getSmokingSettings } from '@/db';
 import { dbGetFirstAsync, dbRunAsync } from '@/db/client';
+import { getUserPreferences } from '@/services/preferencesService';
 import type { MutationResult } from '@/services/types';
+import { formatMoneyFromCents } from '@/utils/currency';
 
 export type WeeklyReportPayload = {
   version: 1;
@@ -22,7 +24,10 @@ function weekStart(date = new Date()) {
 }
 
 export async function generateWeeklyReport(): Promise<WeeklyReportPayload | null> {
-  const settings = await getSmokingSettings();
+  const [settings, preferences] = await Promise.all([
+    getSmokingSettings(),
+    getUserPreferences(),
+  ]);
   if (!settings) return null;
   const start = weekStart();
   const end = start + 604800000;
@@ -65,13 +70,14 @@ export async function generateWeeklyReport(): Promise<WeeklyReportPayload | null
     `INSERT INTO weekly_report (
       week_start, generated_at, baseline_cigarettes,
       cost_per_cigarette_cents, currency_code, payload_json
-    ) VALUES (?, ?, ?, ?, 'INR', ?)
+    ) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(week_start) DO NOTHING`,
     [
       start,
       Date.now(),
       settings.cigarettesPerDay,
       settings.costPerCigaretteCents,
+      preferences.currencyCode,
       JSON.stringify(payload),
     ],
   );
@@ -93,13 +99,21 @@ export async function exportWeeklyReport(): Promise<MutationResult> {
         { cause: error },
       );
     }
-    const report = await generateWeeklyReport();
+    const [report, preferences] = await Promise.all([
+      generateWeeklyReport(),
+      getUserPreferences(),
+    ]);
     if (!report) throw new Error('Complete setup before exporting a report.');
+    const moneySaved = formatMoneyFromCents(
+      report.moneySavedCents,
+      preferences.currencyCode,
+    );
     const file = await Print.printToFileAsync({
       html: `<html><body style="font-family: sans-serif; padding: 32px">
         <h1>Your weekly progress</h1>
         <p>Cigarettes recorded: ${report.total}</p>
         <p>Cigarettes avoided: ${report.cigarettesAvoided}</p>
+        <p>Estimated savings: ${moneySaved}</p>
         <p>Cravings resisted: ${report.resisted}</p>
         <p>Cravings delayed: ${report.delayed}</p>
         <p>Top trigger: ${report.topTrigger ?? 'Not enough data yet'}</p>
