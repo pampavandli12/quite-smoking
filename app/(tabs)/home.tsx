@@ -21,6 +21,12 @@ import {
   SectionHeader,
 } from '@/components/ui';
 import { getActiveQuitPlan } from '@/services/quitPlanService';
+import { getUserPreferences } from '@/services/preferencesService';
+import {
+  detectCurrencyFromDevice,
+  formatMoney,
+  type CurrencyCode,
+} from '@/utils/currency';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -70,11 +76,14 @@ export default function HomePage() {
   const [logging, setLogging] = useState(false);
   const [triggerVisible, setTriggerVisible] = useState(false);
   const [undoLogId, setUndoLogId] = useState<number>();
+  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(
+    detectCurrencyFromDevice(),
+  );
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [today, yesterday, logs, weekly, streak, settings, plan] =
+      const [today, yesterday, logs, weekly, streak, settings, plan, preferences] =
         await Promise.all([
           getTodayStats(),
           getYesterdayStats(),
@@ -83,10 +92,12 @@ export default function HomePage() {
           getNonSmokingStreak(),
           getSmokingSettings(),
           getActiveQuitPlan(),
+          getUserPreferences(),
         ]);
       const dailyTarget =
         plan?.currentDailyTarget ?? settings?.cigarettesPerDay ?? 0;
       const avoided = Math.max(0, dailyTarget - today);
+      setCurrencyCode(preferences.currencyCode);
       setSnapshot({
         today,
         yesterday,
@@ -242,10 +253,14 @@ export default function HomePage() {
           />
           <MetricCard
             label='Saved today'
-            value={`₹${Math.round(snapshot.moneySaved)}`}
+            value={formatMoney(snapshot.moneySaved, currencyCode, {
+              compact: true,
+            })}
             icon='wallet-outline'
             tone='success'
-            accessibilityLabel={`${Math.round(snapshot.moneySaved)} rupees saved today`}
+            accessibilityLabel={`${formatMoney(snapshot.moneySaved, currencyCode, {
+              compact: true,
+            })} saved today`}
           />
         </View>
 

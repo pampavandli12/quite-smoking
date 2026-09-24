@@ -93,6 +93,10 @@ Creates a production Android build. This profile sets `PAYWALL_BYPASS=false`.
 eas build --profile production --platform android
 ```
 
+Release builds enable R8 code shrinking and obfuscation through
+`expo-build-properties`. After the build finishes, download `mapping.txt` from
+the EAS artifacts and upload it in Play Console so crash reports stay readable.
+
 Submit the latest production build to Google Play:
 
 ```bash

@@ -10,6 +10,7 @@ import {
   getProgressChartLabels,
   getProgressChartVerticalLayout,
 } from '@/utils/progressChart';
+import { formatMoney, type CurrencyCode } from '@/utils/currency';
 import {
   getAverage,
   getAverageLabel,
@@ -40,6 +41,7 @@ export type { StatsPeriod } from '@/utils/statistics';
 
 type StatsTimelineChartProps = {
   chartData: number[];
+  currencyCode: CurrencyCode;
   currentTotal: number;
   onPeriodChange: (period: StatsPeriod) => void;
   period: StatsPeriod;
@@ -234,6 +236,7 @@ function PointTooltip({
 
 export default function StatsTimelineChart({
   chartData,
+  currencyCode,
   currentTotal,
   onPeriodChange,
   period,
@@ -286,10 +289,12 @@ export default function StatsTimelineChart({
     .map((item) => item.accessibilityLabel)
     .filter(Boolean)
     .join(', ');
-  const costPerCigaretteDisplay =
-    smokingSettings?.costPerCigaretteCents
-      ? (smokingSettings.costPerCigaretteCents / 100).toFixed(2)
-      : '0.00';
+  const costPerCigaretteDisplay = smokingSettings?.costPerCigaretteCents
+    ? formatMoney(
+        smokingSettings.costPerCigaretteCents / 100,
+        currencyCode,
+      )
+    : formatMoney(0, currencyCode);
   const stackSummaryCards = windowWidth < 350;
 
   const handleChartLayout = (event: LayoutChangeEvent) => {
@@ -375,11 +380,10 @@ export default function StatsTimelineChart({
                   },
                 ]}
               >
-                {moneySaved >= 0 ? '₹' : '-₹'}
-                {Math.abs(moneySaved)}
+                {formatMoney(moneySaved, currencyCode, { compact: true })}
               </Text>
               <Text variant='bodySmall' style={{ color: theme.colors.onSurfaceVariant }}>
-                ₹{costPerCigaretteDisplay} × {Math.abs(cigarettesSaved)}{' '}
+                {costPerCigaretteDisplay} × {Math.abs(cigarettesSaved)}{' '}
                 {moneySaved >= 0 ? 'avoided' : 'above baseline'}
               </Text>
             </View>

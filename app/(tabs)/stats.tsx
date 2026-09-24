@@ -29,6 +29,8 @@ import {
   TopTriggersSection,
 } from '@/components/StatsBreakdownSections';
 import { loadTimeline } from '@/services/statsTimeline';
+import { getUserPreferences } from '@/services/preferencesService';
+import { detectCurrencyFromDevice, type CurrencyCode } from '@/utils/currency';
 import { resolveFeatureAccess } from '@/services/accessService';
 import { router } from 'expo-router';
 import AdvancedInsights from '@/components/AdvancedInsights';
@@ -101,6 +103,9 @@ export default function StatsPage() {
   const [timelineError, setTimelineError] = useState('');
   const [smokingSettings, setSmokingSettings] =
     useState<SmokingBaseline | null>(null);
+  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(
+    detectCurrencyFromDevice(),
+  );
   const statsRequestId = useRef(0);
   const hasLoadedRef = useRef(false);
   const percentageChange = getPercentageChange(currentTotal, previousTotal);
@@ -157,12 +162,14 @@ export default function StatsPage() {
               }
             }
 
-            const [today, yesterday, topTrigger, settings] = await Promise.all([
-              getTodayStats(),
-              getYesterdayStats(),
-              getTopTrigger(),
-              getSmokingSettings(),
-            ]);
+            const [today, yesterday, topTrigger, settings, preferences] =
+              await Promise.all([
+                getTodayStats(),
+                getYesterdayStats(),
+                getTopTrigger(),
+                getSmokingSettings(),
+                getUserPreferences(),
+              ]);
 
             if (requestId !== statsRequestId.current) {
               return;
@@ -176,6 +183,7 @@ export default function StatsPage() {
                   : getFallbackMessage(),
             );
             setSmokingSettings(settings ?? null);
+            setCurrencyCode(preferences.currencyCode);
           } catch (error) {
             console.error('Error loading stats:', error);
           }
@@ -277,6 +285,7 @@ export default function StatsPage() {
             )}
             <StatsTimelineChart
               chartData={chartData}
+              currencyCode={currencyCode}
               currentTotal={currentTotal}
               onPeriodChange={handlePeriodChange}
               period={selectedPeriod}

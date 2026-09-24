@@ -50,6 +50,7 @@ function formatPlanDate(date: Date) {
 
 export default function PlanPage() {
   const theme = useTheme();
+  const themeKey = theme.dark ? 'dark' : 'light';
   const { width } = useWindowDimensions();
   const [plan, setPlan] = useState<QuitPlan | null>(null);
   const [weeks, setWeeks] = useState<PlanWeek[]>([]);
@@ -126,6 +127,9 @@ export default function PlanPage() {
           <SectionHeader title='Choose your path' subtitle='You can pause or adjust later without losing history.' />
           <View style={[styles.modeGrid, width < 360 && styles.modeGridStacked]}>
             <TouchableRipple
+              // Remount on theme change: Android ripple hosts don't repaint
+              // background/border colors until pressed.
+              key={`gradual-${themeKey}`}
               borderless
               onPress={() => setMode('gradual_reduction')}
               style={[
@@ -149,6 +153,7 @@ export default function PlanPage() {
               </View>
             </TouchableRipple>
             <TouchableRipple
+              key={`quit-date-${themeKey}`}
               borderless
               onPress={() => setMode('quit_date')}
               style={[
@@ -179,6 +184,7 @@ export default function PlanPage() {
                 subtitle='Your weekly targets will be built toward this date.'
               />
               <TouchableRipple
+                key={themeKey}
                 accessibilityLabel={`Target quit date ${formatPlanDate(quitDate)}`}
                 accessibilityRole='button'
                 borderless
@@ -307,7 +313,7 @@ export default function PlanPage() {
               const expanded = expandedWeek === week.id;
               return (
                 <TouchableRipple
-                  key={week.id}
+                  key={`${week.id}-${themeKey}`}
                   borderless
                   onPress={() => setExpandedWeek(expanded ? undefined : week.id)}
                   style={[
@@ -328,7 +334,16 @@ export default function PlanPage() {
                             color={theme.colors.onPrimary}
                           />
                         ) : (
-                          <Text variant='labelSmall'>{index + 1}</Text>
+                          <Text
+                            variant='labelSmall'
+                            style={{
+                              color: current
+                                ? theme.colors.onPrimary
+                                : theme.colors.onSurfaceVariant,
+                            }}
+                          >
+                            {index + 1}
+                          </Text>
                         )}
                       </View>
                       <View style={{ flex: 1 }}>
@@ -343,6 +358,7 @@ export default function PlanPage() {
                         <AppSymbol
                           name={expanded ? 'chevron-up' : 'chevron-down'}
                           size={20}
+                          color={theme.colors.onSurfaceVariant}
                         />
                       )}
                     </View>

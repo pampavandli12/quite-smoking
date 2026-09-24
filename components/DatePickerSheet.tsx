@@ -188,6 +188,9 @@ export default function DatePickerSheet({
               return (
                 <View key={date.toISOString()} style={styles.cell}>
                   <TouchableRipple
+                    // Remount on theme change: Android ripple hosts don't
+                    // repaint background colors until pressed.
+                    key={theme.dark ? 'dark' : 'light'}
                     accessibilityLabel={date.toLocaleDateString(undefined, {
                       weekday: 'long',
                       month: 'long',

@@ -459,7 +459,9 @@ export default function SubscriptionPage() {
                   accessibilityRole='radio'
                   accessibilityState={{ checked: selected }}
                   borderless
-                  key={item.identifier}
+                  // Theme in key: Android ripple hosts don't repaint colors
+                  // on theme change until pressed.
+                  key={`${item.identifier}-${theme.dark ? 'dark' : 'light'}`}
                   onPress={() => setSubscriptionPackage(item)}
                   style={[
                     styles.packageCard,
