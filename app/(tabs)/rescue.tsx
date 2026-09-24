@@ -266,7 +266,9 @@ export default function RescuePage() {
                     accessibilityRole='radio'
                     accessibilityState={{ checked: selected }}
                     borderless
-                    key={value}
+                    // Theme in key: Android ripple hosts don't repaint
+                    // colors on theme change until pressed.
+                    key={`${value}-${theme.dark ? 'dark' : 'light'}`}
                     onPress={() => setIntensity(String(value))}
                     style={[
                       styles.intensityButton,

@@ -149,7 +149,7 @@ export default function SmokingSetupScreen() {
                   }
                   style={[styles.counterButton, { borderColor: theme.colors.outlineVariant }]}
                 >
-                  <AppSymbol name='minus' size={24} />
+                  <AppSymbol name='minus' size={24} color={theme.colors.onSurface} />
                 </AnimatedPressable>
                 <TextInput
                   accessibilityLabel='Cigarettes per day'
@@ -168,7 +168,7 @@ export default function SmokingSetupScreen() {
                   }
                   style={[styles.counterButton, { borderColor: theme.colors.outlineVariant }]}
                 >
-                  <AppSymbol name='plus' size={24} />
+                  <AppSymbol name='plus' size={24} color={theme.colors.onSurface} />
                 </AnimatedPressable>
               </View>
             </>

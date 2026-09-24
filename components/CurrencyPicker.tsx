@@ -28,6 +28,9 @@ export function CurrencyPicker({
         return (
           <View key={code} style={styles.cell}>
             <TouchableRipple
+              // Remount on theme change: Android ripple hosts don't repaint
+              // background/border colors until pressed.
+              key={theme.dark ? 'dark' : 'light'}
               accessibilityLabel={CURRENCY_LABELS[code]}
               accessibilityRole='radio'
               accessibilityState={{ selected, disabled }}

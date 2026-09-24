@@ -6,6 +6,7 @@ import {
 } from 'expo-symbols';
 import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
+import { useTheme } from 'react-native-paper';
 import type { IconSource } from 'react-native-paper/lib/typescript/components/Icon';
 
 type MaterialCommunityIconName = ComponentProps<
@@ -120,14 +121,17 @@ export function AppSymbol({
   filled = false,
   testID,
 }: AppSymbolProps) {
+  const theme = useTheme();
   const symbol = resolveAppSymbol(name, filled);
+  // MaterialCommunityIcons defaults to black, which disappears in dark mode.
+  const tint = color ?? theme.colors.onSurface;
   return (
     <SymbolView
       accessibilityElementsHidden
       importantForAccessibility='no'
       name={symbol.sf}
       size={size}
-      tintColor={color}
+      tintColor={tint}
       weight={weight}
       testID={testID}
       fallback={
@@ -136,7 +140,7 @@ export function AppSymbol({
           importantForAccessibility='no'
           name={symbol.fallback}
           size={size}
-          color={color}
+          color={tint}
           testID={testID}
         />
       }
