@@ -25,6 +25,13 @@ export const CURRENCY_LABELS: Record<CurrencyCode, string> = {
   GBP: 'British Pound (£)',
 };
 
+export const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
+  INR: '₹',
+  USD: '$',
+  CAD: 'CA$',
+  GBP: '£',
+};
+
 const CURRENCY_SYMBOL_NAMES: Record<CurrencyCode, AppSymbolName> = {
   INR: 'currency-inr',
   USD: 'currency-usd',

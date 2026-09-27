@@ -10,6 +10,8 @@ import {
   type SmokingLogTimestampRow,
 } from '@/db';
 import TriggerBottomSheet from '@/components/TriggerBottomSheet';
+import RecoveryCard from '@/components/RecoveryCard';
+import ImpactSection from '@/components/ImpactSection';
 import { AppSymbol, appSymbolSource } from '@/components/AppSymbol';
 import {
   AnimatedNumber,
@@ -22,6 +24,7 @@ import {
 } from '@/components/ui';
 import { getActiveQuitPlan } from '@/services/quitPlanService';
 import { getUserPreferences } from '@/services/preferencesService';
+import { rescheduleReminders } from '@/services/notificationService';
 import {
   detectCurrencyFromDevice,
   formatMoney,
@@ -107,6 +110,7 @@ export default function HomePage() {
         dailyTarget,
         moneySaved: avoided * ((settings?.costPerCigaretteCents ?? 0) / 100),
       });
+      void rescheduleReminders();
     } catch (error) {
       console.error('Error loading Home:', error);
     } finally {
@@ -264,6 +268,8 @@ export default function HomePage() {
           />
         </View>
 
+        <RecoveryCard refreshToken={snapshot} />
+
         <SectionHeader
           title='Recent activity'
           subtitle='Your latest recorded moments'
@@ -320,6 +326,8 @@ export default function HomePage() {
             Explore your progress
           </Button>
         </PremiumCard>
+
+        <ImpactSection refreshToken={snapshot} />
       </ScreenContainer>
 
       <TriggerBottomSheet

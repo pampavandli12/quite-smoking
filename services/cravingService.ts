@@ -1,5 +1,6 @@
 import { dbGetAllAsync, dbGetFirstAsync, dbTransactionAsync } from '@/db/client';
 import { emitDataChange } from '@/services/dataEvents';
+import { normalizeCravingNote } from '@/utils/triggers';
 import type {
   CopingStrategy,
   CravingOutcome,
@@ -20,6 +21,9 @@ const fallbackStrategy: Record<string, CopingStrategy> = {
   coffee: 'water',
   boredom: 'distraction',
   'after meals': 'walk',
+  'social situations': 'distraction',
+  alcohol: 'water',
+  habit: 'urge_surfing',
 };
 
 export async function getRecommendedStrategy(trigger: string) {
@@ -79,6 +83,7 @@ export async function completeCravingSession(input: {
   id: number;
   intensityAfter: number;
   outcome: CravingOutcome;
+  note?: string;
 }): Promise<MutationResult<{ smokingLogId?: number }>> {
   try {
     const data = await dbTransactionAsync(async (transaction) => {
@@ -96,9 +101,17 @@ export async function completeCravingSession(input: {
       await transaction.runAsync(
         `UPDATE craving_session
          SET completed_at = ?, intensity_after = ?, outcome = ?,
-             linked_smoking_log_id = ?, updated_at = ?
+             linked_smoking_log_id = ?, note = COALESCE(?, note), updated_at = ?
          WHERE id = ?`,
-        [now, input.intensityAfter, input.outcome, smokingLogId ?? null, now, input.id],
+        [
+          now,
+          input.intensityAfter,
+          input.outcome,
+          smokingLogId ?? null,
+          normalizeCravingNote(input.note),
+          now,
+          input.id,
+        ],
       );
       await transaction.runAsync(
         `UPDATE craving_session_strategy SET completed = 1 WHERE session_id = ?`,

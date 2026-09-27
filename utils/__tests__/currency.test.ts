@@ -1,10 +1,12 @@
 import {
+  CURRENCY_SYMBOLS,
   currencyForRegion,
   detectCurrencyFromDevice,
   formatMoney,
   formatMoneyFromCents,
   getCurrencySymbolName,
   isCurrencyCode,
+  SUPPORTED_CURRENCIES,
 } from '../currency';
 
 describe('currency utilities', () => {
@@ -47,5 +49,13 @@ describe('currency utilities', () => {
   it('formats negative savings with the currency symbol', () => {
     expect(formatMoney(-12, 'USD', { compact: true })).toContain('12');
     expect(formatMoney(-12, 'USD', { compact: true })).toMatch(/^-/);
+  });
+});
+
+describe('currency symbols', () => {
+  it('has a symbol for every supported currency', () => {
+    for (const code of SUPPORTED_CURRENCIES) {
+      expect(CURRENCY_SYMBOLS[code]).toBeTruthy();
+    }
   });
 });

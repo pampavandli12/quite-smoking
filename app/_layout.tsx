@@ -18,6 +18,8 @@ import { Button, PaperProvider, Text } from "react-native-paper";
 import { AppSymbol, appSymbolSource } from "../components/AppSymbol";
 import { initializeDatabase } from "../db/client";
 import PurchaseService from "../services/purchases";
+import { subscribeToDataChanges } from "@/services/dataEvents";
+import { rescheduleReminders } from "@/services/notificationService";
 import { darkTheme, lightTheme } from '@/theme';
 
 // Keep the splash screen visible while we fetch resources
@@ -60,6 +62,23 @@ export default function RootLayout() {
   useEffect(() => {
     setupDatabase();
   }, [setupDatabase]);
+
+  // Keep opt-in milestone and plan reminders in sync with data changes.
+  useEffect(() => {
+    if (databaseStatus !== "ready") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = subscribeToDataChanges((domain) => {
+      if (domain !== "history" && domain !== "craving" && domain !== "plan") {
+        return;
+      }
+      clearTimeout(timer);
+      timer = setTimeout(() => void rescheduleReminders(), 500);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [databaseStatus]);
 
   useEffect(() => {
     async function setupPurchases() {
@@ -192,6 +211,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="history" />
+          <Stack.Screen name="health" />
         </Stack>
       </ThemeProvider>
     </PaperProvider>

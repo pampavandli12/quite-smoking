@@ -19,6 +19,7 @@ import {
   type QuitPlan,
 } from '@/services/quitPlanService';
 import { getEffectivePlanWeek } from '@/utils/quitPlan';
+import { strategyLabel } from '@/utils/strategies';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -365,7 +366,7 @@ export default function PlanPage() {
                     {expanded ? (
                       <Text style={[styles.weekDetail, { color: theme.colors.onSurfaceVariant }]}>
                         {week.focusStrategy
-                          ? `Practice ${week.focusStrategy.replace('_', ' ')} when ${week.focusTrigger ?? 'a craving'} appears.`
+                          ? `When ${week.focusTrigger ?? 'a craving'} shows up, try: ${strategyLabel(week.focusStrategy)}.`
                           : 'Notice your strongest triggers and practice creating a short pause.'}
                       </Text>
                     ) : null}

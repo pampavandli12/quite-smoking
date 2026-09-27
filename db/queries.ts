@@ -658,3 +658,54 @@ export async function getNonSmokingStreak() {
     return 0;
   }
 }
+
+// Latest valid smoking timestamp in epoch ms (legacy string timestamps included).
+export async function getLastSmokingTimestamp(): Promise<number | null> {
+  const row = await dbGetFirstAsync<{ timestamp: number | null }>(
+    `
+      SELECT MAX(${TIMESTAMP_MS_SQL}) as timestamp
+      FROM smoking_log
+      WHERE ${VALID_TIMESTAMP_SQL}
+    `,
+  );
+  return typeof row?.timestamp === 'number' ? row.timestamp : null;
+}
+
+export type DailySmokingCountRow = { day: string; count: number };
+
+// Count per local calendar day (YYYY-MM-DD), for all valid logs.
+export async function getDailySmokingCounts(): Promise<DailySmokingCountRow[]> {
+  return dbGetAllAsync<DailySmokingCountRow>(
+    `
+      SELECT
+        strftime('%Y-%m-%d', ${TIMESTAMP_SECONDS_SQL}, 'unixepoch', 'localtime') as day,
+        COUNT(*) as count
+      FROM smoking_log
+      WHERE ${VALID_TIMESTAMP_SQL}
+      GROUP BY day
+      ORDER BY day ASC
+    `,
+  );
+}
+
+export type SmokingSettingsHistoryRow = {
+  cigarettesPerDay: number;
+  costPerCigaretteCents: number;
+  createdAt: number | string;
+};
+
+// Every baseline the user has saved, oldest first.
+export async function getSmokingSettingsHistory(): Promise<
+  SmokingSettingsHistoryRow[]
+> {
+  return dbGetAllAsync<SmokingSettingsHistoryRow>(
+    `
+      SELECT
+        cigarettes_per_day as cigarettesPerDay,
+        cost_per_cigarette_cents as costPerCigaretteCents,
+        created_at as createdAt
+      FROM user_smoking_settings
+      ORDER BY created_at ASC, id ASC
+    `,
+  );
+}

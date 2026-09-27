@@ -49,3 +49,13 @@ export async function getCopingEffectiveness(): Promise<CopingEffectiveness[]> {
     rate: Math.round((row.successful / row.sessions) * 100),
   }));
 }
+
+// All-time most frequent triggers, used to personalise new plans.
+export function getTopTriggers(limit = 3, minCount = 3) {
+  return dbGetAllAsync<{ trigger: string; count: number }>(
+    `SELECT trigger, COUNT(*) AS count FROM smoking_log_triggers
+     GROUP BY trigger HAVING COUNT(*) >= ?
+     ORDER BY count DESC, trigger ASC LIMIT ?`,
+    [minCount, limit],
+  );
+}
