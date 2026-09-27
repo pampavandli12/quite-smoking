@@ -1,4 +1,10 @@
-type DataDomain = 'history' | 'craving' | 'plan' | 'preferences' | 'report';
+type DataDomain =
+  | 'history'
+  | 'craving'
+  | 'plan'
+  | 'preferences'
+  | 'report'
+  | 'goal';
 type Listener = (domain: DataDomain) => void;
 
 const listeners = new Set<Listener>();

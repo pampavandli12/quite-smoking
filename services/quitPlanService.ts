@@ -1,10 +1,13 @@
 import { dbGetAllAsync, dbGetFirstAsync, dbTransactionAsync } from '@/db/client';
+import { getRecommendedStrategy } from '@/services/cravingService';
 import { emitDataChange } from '@/services/dataEvents';
+import { getTopTriggers } from '@/services/insightService';
 import type {
   MutationResult,
   QuitPlanMode,
   QuitPlanStatus,
 } from '@/services/types';
+import { buildWeekFocus, type TriggerFocus } from '@/utils/quitPlan';
 
 export type QuitPlan = {
   id: number;
@@ -35,6 +38,22 @@ function createTargets(baseline: number, weeks: number, mode: QuitPlanMode) {
   });
 }
 
+// Personalisation is best effort: a failure here must never block a plan.
+async function loadTriggerFocuses(): Promise<TriggerFocus[]> {
+  try {
+    const triggers = await getTopTriggers();
+    return await Promise.all(
+      triggers.map(async ({ trigger }) => ({
+        trigger,
+        strategy: await getRecommendedStrategy(trigger),
+      })),
+    );
+  } catch (error) {
+    console.error('Error personalising plan weeks:', error);
+    return [];
+  }
+}
+
 export async function createQuitPlan(input: {
   mode: QuitPlanMode;
   baselineCigarettesPerDay: number;
@@ -42,6 +61,8 @@ export async function createQuitPlan(input: {
   motivation?: string;
 }): Promise<MutationResult<QuitPlan>> {
   try {
+    // Read before the transaction: db calls are serialized through one queue.
+    const focuses = await loadTriggerFocuses();
     const plan = await dbTransactionAsync(async (transaction) => {
       const now = Date.now();
       await transaction.runAsync(
@@ -71,12 +92,21 @@ export async function createQuitPlan(input: {
         ? Math.max(1, Math.ceil((input.targetQuitAt - now) / 604800000))
         : 8;
       const targets = createTargets(input.baselineCigarettesPerDay, weekCount, input.mode);
+      const weekFocus = buildWeekFocus(targets.length, focuses);
       for (let index = 0; index < targets.length; index += 1) {
         await transaction.runAsync(
           `INSERT INTO plan_week (
-            plan_id, week_index, starts_at, target_cigarettes_per_day
-          ) VALUES (?, ?, ?, ?)`,
-          [row.id, index, now + index * 604800000, targets[index]],
+            plan_id, week_index, starts_at, target_cigarettes_per_day,
+            focus_trigger, focus_strategy
+          ) VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            row.id,
+            index,
+            now + index * 604800000,
+            targets[index],
+            weekFocus[index].focusTrigger,
+            weekFocus[index].focusStrategy,
+          ],
         );
       }
       return {

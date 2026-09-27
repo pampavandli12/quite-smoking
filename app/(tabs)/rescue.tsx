@@ -14,8 +14,12 @@ import {
   ScreenHeader,
   StatusPill,
 } from '@/components/ui';
-import { appSymbolSource } from '@/components/AppSymbol';
+import { AppSymbol, appSymbolSource } from '@/components/AppSymbol';
 import { resolveFeatureAccess } from '@/services/accessService';
+import { getActiveQuitPlan } from '@/services/quitPlanService';
+import { STRATEGY_LABELS } from '@/utils/strategies';
+import { MAX_CRAVING_NOTE_LENGTH, RESCUE_TRIGGERS } from '@/utils/triggers';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppMotion } from '@/hooks/useAppMotion';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -36,19 +40,12 @@ import {
   SegmentedButtons,
   Surface,
   Text,
+  TextInput,
   TouchableRipple,
   useTheme,
 } from 'react-native-paper';
 
-const triggers = ['stress', 'coffee', 'boredom', 'after meals', 'anxiety'];
-const strategyLabels: Record<CopingStrategy, string> = {
-  breathing: 'Slow breathing',
-  walk: 'Take a short walk',
-  water: 'Drink water',
-  distraction: 'Quick distraction',
-  urge_surfing: 'Ride the urge',
-  custom: 'My own strategy',
-};
+const strategyLabels = STRATEGY_LABELS;
 const stepIndex = { 'check-in': 0, timer: 1, outcome: 2, complete: 3 } as const;
 const intensityOptions = [2, 4, 6, 8, 10];
 type Step = keyof typeof stepIndex;
@@ -66,6 +63,8 @@ export default function RescuePage() {
   const [paused, setPaused] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [motivation, setMotivation] = useState<string | null>(null);
+  const [reflection, setReflection] = useState('');
   const breathing = useSharedValue(1);
 
   useEffect(() => {
@@ -73,6 +72,14 @@ export default function RescuePage() {
       .then(setStrategy)
       .catch(() => setStrategy('breathing'));
   }, [trigger]);
+
+  useFocusEffect(
+    useCallback(() => {
+      getActiveQuitPlan()
+        .then((plan) => setMotivation(plan?.motivation?.trim() || null))
+        .catch(() => setMotivation(null));
+    }, []),
+  );
 
   useEffect(() => {
     getIncompleteCravingSession()
@@ -159,6 +166,7 @@ export default function RescuePage() {
         id: sessionId,
         intensityAfter: Math.max(1, Number(intensity) - 2),
         outcome,
+        note: reflection,
       });
       if (!result.success) {
         setErrorMessage('This check-in could not be saved. Please try again.');
@@ -176,7 +184,7 @@ export default function RescuePage() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     },
-    [intensity, sessionId],
+    [intensity, reflection, sessionId],
   );
 
   const reset = () => {
@@ -184,6 +192,7 @@ export default function RescuePage() {
     setSessionId(undefined);
     setPaused(false);
     setErrorMessage('');
+    setReflection('');
   };
 
   return (
@@ -240,7 +249,7 @@ export default function RescuePage() {
               Choose the closest match. There is no wrong answer.
             </Text>
             <View style={styles.chips}>
-              {triggers.map((item) => (
+              {RESCUE_TRIGGERS.map((item) => (
                 <Chip
                   key={item}
                   selected={trigger === item}
@@ -367,6 +376,25 @@ export default function RescuePage() {
                   ? 'Resume when you feel ready.'
                   : 'Breathe gently. An urge can rise and fall without requiring an action.'}
               </Text>
+              {motivation ? (
+                <Surface
+                  elevation={0}
+                  style={[
+                    styles.reason,
+                    { backgroundColor: theme.colors.secondaryContainer },
+                  ]}
+                >
+                  <AppSymbol
+                    name='heart-outline'
+                    size={22}
+                    color={theme.colors.primary}
+                  />
+                  <View style={styles.reasonCopy}>
+                    <Text variant='labelLarge'>Your reason</Text>
+                    <Text variant='bodyMedium'>“{motivation}”</Text>
+                  </View>
+                </Surface>
+              ) : null}
               <View style={styles.timerActions}>
                 <Button
                   mode='outlined'
@@ -398,6 +426,14 @@ export default function RescuePage() {
             <Text style={{ color: theme.colors.onSurfaceVariant }}>
               Whatever happened, recording it helps your plan learn.
             </Text>
+            <TextInput
+              mode='outlined'
+              label='What helped or got in the way? (optional)'
+              value={reflection}
+              onChangeText={setReflection}
+              maxLength={MAX_CRAVING_NOTE_LENGTH}
+              style={styles.reflection}
+            />
             <Button
               contentStyle={styles.outcome}
               style={styles.section}
@@ -519,6 +555,17 @@ const styles = StyleSheet.create({
     maxWidth: 180,
   },
   outcome: { minHeight: 52 },
+  reason: {
+    alignItems: 'center',
+    borderRadius: 20,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+    padding: 14,
+    width: '100%',
+  },
+  reasonCopy: { flex: 1, minWidth: 0 },
+  reflection: { marginTop: 16 },
   error: { marginBottom: 12 },
   disclaimer: { textAlign: 'center', marginTop: 24 },
 });

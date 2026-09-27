@@ -15,6 +15,10 @@ import {
   disableNotifications,
   enableDailyCheckIn,
   getNotificationPreferences,
+  getReminderSettings,
+  setReminderEnabled,
+  type ReminderKind,
+  type ReminderSettings,
 } from '@/services/notificationService';
 import {
   getUserPreferences,
@@ -91,6 +95,10 @@ function SettingsRow({
 export default function SettingsPage() {
   const theme = useTheme<AppTheme>();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [reminders, setReminders] = useState<ReminderSettings>({
+    milestone: false,
+    plan: false,
+  });
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [motionPreference, setMotionPreference] = useState<MotionPreference>('system');
   const [baseline, setBaseline] = useState('Not configured');
@@ -105,15 +113,17 @@ export default function SettingsPage() {
 
   const load = useCallback(async () => {
     try {
-      const [notifications, preferences, settings, access, supportId] =
+      const [notifications, preferences, settings, access, supportId, reminderSettings] =
         await Promise.all([
           getNotificationPreferences(),
           getUserPreferences(),
           getSmokingSettings(),
           resolveFeatureAccess(),
           PurchaseService.getAppUserID(),
+          getReminderSettings(),
         ]);
       setNotificationsEnabled(notifications?.enabled === 1);
+      setReminders(reminderSettings);
       setHapticsEnabled(preferences.hapticsEnabled);
       setMotionPreference(preferences.motionPreference);
       setCurrencyCode(preferences.currencyCode);
@@ -170,6 +180,18 @@ export default function SettingsPage() {
     }
   };
 
+  const toggleReminder = async (kind: ReminderKind) => {
+    const next = !reminders[kind];
+    const result = await setReminderEnabled(kind, next);
+    if (result.success) {
+      setReminders((current) => ({ ...current, [kind]: next }));
+    } else {
+      Alert.alert(
+        'Notifications unavailable',
+        result.error instanceof Error ? result.error.message : 'Please try again.',
+      );
+    }
+  };
   const openUrl = async (url: string) => {
     try {
       if (await Linking.canOpenURL(url)) await Linking.openURL(url);
@@ -318,6 +340,20 @@ export default function SettingsPage() {
           label='Daily check-in'
           value={notificationsEnabled ? 'Scheduled for 8:00 PM' : 'Off'}
           trailing={<Switch value={notificationsEnabled} onValueChange={toggleNotifications} />}
+        />
+        <Divider />
+        <SettingsRow
+          icon='heart-pulse'
+          label='Recovery milestones'
+          value='When your body reaches a new milestone'
+          trailing={<Switch value={reminders.milestone} onValueChange={() => toggleReminder('milestone')} />}
+        />
+        <Divider />
+        <SettingsRow
+          icon='calendar-check'
+          label='Plan week reminders'
+          value='When a new weekly target begins'
+          trailing={<Switch value={reminders.plan} onValueChange={() => toggleReminder('plan')} />}
         />
       </PremiumCard>
 
